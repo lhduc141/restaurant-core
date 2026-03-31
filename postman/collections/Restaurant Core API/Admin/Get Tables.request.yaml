@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/admin/v1/tables"
+method: GET
+order: 1000

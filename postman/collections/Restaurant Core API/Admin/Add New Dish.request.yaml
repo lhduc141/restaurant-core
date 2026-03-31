@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{base_url}}/admin/v1/new_dish"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "itemName": "Fried Rice",
+      "type_of_food": "Main",
+      "price": 50,
+      "descriptions": "Delicious",
+      "preparation_time": 10,
+      "image": ""
+    }
+order: 2000

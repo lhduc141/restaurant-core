@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{base_url}}/admin/v1/edit_menu"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "itemID": 1,
+      "itemName": "Updated Dish",
+      "price": 60
+    }
+order: 3000

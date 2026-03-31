@@ -1,0 +1,4 @@
+$kind: collection
+description: Collection for testing Restaurant Core backend
+variables:
+  base_url: http://localhost:3001

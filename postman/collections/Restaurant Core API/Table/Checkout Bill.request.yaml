@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/table/v1/orders/1/checkout"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "payment_method": "Cash",
+      "feedback": "Good service"
+    }
+order: 4000

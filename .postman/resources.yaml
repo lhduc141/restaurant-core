@@ -1,0 +1,12 @@
+# Use this workspace to collaborate
+workspace:
+  id: 979d0f94-a94e-4567-92cf-297fd924781f
+cloudResources:
+  collections:
+    ..\postman\collections\Restaurant Core API: 728bbe2f-f90a-4686-9c61-5389e484bebd
+
+# All resources in the `postman/` folder are automatically registered in Local View.
+# Point to additional files outside the `postman/` folder to register them individually. Example:
+#localResources:
+#  collections:
+#    - ../tests/E2E Test Collection/

@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{base_url}}/table/v1/menu-item"
+method: GET
+order: 2000
