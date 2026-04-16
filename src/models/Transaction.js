@@ -1,44 +1,48 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Transaction extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
+export default function(sequelize) {
+  return sequelize.define('Transaction', {
     transactionID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    customerID: {
+    sessionID: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
-        model: 'Customer',
-        key: 'customerID'
+        model: 'ServiceSession',
+        key: 'sessionID'
       }
     },
-    payment_method: {
-      type: DataTypes.STRING(50),
-      allowNull: false
+    paymentMethod: {
+      type: DataTypes.ENUM('CASH','CARD','TRANSFER','OTHER'),
+      allowNull: true,
+      defaultValue: "CASH"
     },
-    date: {
-      type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    paymentStatus: {
+      type: DataTypes.ENUM('PENDING','PAID','CANCELLED'),
+      allowNull: true,
+      defaultValue: "PENDING"
+    },
+    totalPrice: {
+      type: DataTypes.DECIMAL(10,2),
+      allowNull: false
     },
     feedback: {
       type: DataTypes.STRING(500),
       allowNull: true
     },
-    totalPrice: {
-      type: DataTypes.FLOAT,
+    paidAt: {
+      type: DataTypes.DATE,
       allowNull: true
     }
   }, {
     sequelize,
     tableName: 'Transaction',
-    timestamps: false,
+    timestamps: true,
     indexes: [
       {
         name: "PRIMARY",
@@ -49,13 +53,19 @@ export default class Transaction extends Model {
         ]
       },
       {
-        name: "customerID",
+        name: "idx_sessionID",
         using: "BTREE",
         fields: [
-          { name: "customerID" },
+          { name: "sessionID" },
+        ]
+      },
+      {
+        name: "idx_Transaction_paymentStatus",
+        using: "BTREE",
+        fields: [
+          { name: "paymentStatus" },
         ]
       },
     ]
   });
-  }
 }

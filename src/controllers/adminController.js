@@ -1,7 +1,6 @@
 import { responseData } from "../config/response.js";
 import * as service from "../services/adminServices.js";
 
-
 export default class AdminController {
 
   static async editStatusOfMenuItems(req, res) {
@@ -32,8 +31,7 @@ export default class AdminController {
     }
     return responseData(res, "success", data, status);
   }
-  
-  
+
   static async getItemsOfTables(req, res) {
     const { error, data, status } = await service.getItemsOfTablesService();
 
@@ -43,8 +41,6 @@ export default class AdminController {
     return responseData(res, "success", data, status);
   }
 
-
-  
   static async viewDetailTransaction(req, res) {
     const { transactionID } = req.body;
     const { error, data, status } = await service.viewDetailTransactionService(transactionID);
@@ -54,8 +50,7 @@ export default class AdminController {
     }
     return responseData(res, "", data, status);
   }
-  
-  
+
   static async getDailyRevenue(req, res) {
     const { date } = req.body;
     const { error, data, status } = await service.getDailyRevenueService(date);

@@ -1,9 +1,8 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Menu_Item extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
+export default function(sequelize) {
+  return sequelize.define('MenuItem', {
     itemID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
@@ -14,25 +13,26 @@ export default class Menu_Item extends Model {
       type: DataTypes.STRING(255),
       allowNull: false
     },
-    type_of_food: {
-      type: DataTypes.STRING(255),
+    typeOfFood: {
+      type: DataTypes.STRING(100),
       allowNull: true
     },
     price: {
-      type: DataTypes.FLOAT,
-      allowNull: true
+      type: DataTypes.DECIMAL(10,2),
+      allowNull: false
     },
     descriptions: {
       type: DataTypes.STRING(500),
       allowNull: true
     },
-    preparation_time: {
-      type: DataTypes.FLOAT,
+    preparationTime: {
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     status: {
       type: DataTypes.BOOLEAN,
-      allowNull: false
+      allowNull: true,
+      defaultValue: 1
     },
     image: {
       type: DataTypes.TEXT,
@@ -40,8 +40,8 @@ export default class Menu_Item extends Model {
     }
   }, {
     sequelize,
-    tableName: 'Menu_Item',
-    timestamps: false,
+    tableName: 'MenuItem',
+    timestamps: true,
     indexes: [
       {
         name: "PRIMARY",
@@ -51,7 +51,13 @@ export default class Menu_Item extends Model {
           { name: "itemID" },
         ]
       },
+      {
+        name: "idx_MenuItem_status",
+        using: "BTREE",
+        fields: [
+          { name: "status" },
+        ]
+      },
     ]
   });
-  }
 }

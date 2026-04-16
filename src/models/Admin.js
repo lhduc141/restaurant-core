@@ -1,26 +1,30 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Admin extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
-    AdminID: {
+export default function(sequelize) {
+  return sequelize.define('Admin', {
+    adminID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    userID: {
+    accountID: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'Account',
-        key: 'userID'
-      }
+        key: 'accountID'
+      },
+      unique: "fk_Admin_Account"
     },
     adminName: {
       type: DataTypes.STRING(255),
       allowNull: false
+    },
+    phone: {
+      type: DataTypes.STRING(20),
+      allowNull: true
     }
   }, {
     sequelize,
@@ -32,17 +36,24 @@ export default class Admin extends Model {
         unique: true,
         using: "BTREE",
         fields: [
-          { name: "AdminID" },
+          { name: "adminID" },
         ]
       },
       {
-        name: "userID",
+        name: "accountID",
+        unique: true,
         using: "BTREE",
         fields: [
-          { name: "userID" },
+          { name: "accountID" },
+        ]
+      },
+      {
+        name: "idx_accountID",
+        using: "BTREE",
+        fields: [
+          { name: "accountID" },
         ]
       },
     ]
   });
-  }
 }

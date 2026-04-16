@@ -1,9 +1,8 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Role extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
+export default function(sequelize) {
+  return sequelize.define('Role', {
     roleID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
@@ -11,8 +10,9 @@ export default class Role extends Model {
       primaryKey: true
     },
     roleName: {
-      type: DataTypes.STRING(255),
-      allowNull: false
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      unique: "roleName"
     }
   }, {
     sequelize,
@@ -27,7 +27,14 @@ export default class Role extends Model {
           { name: "roleID" },
         ]
       },
+      {
+        name: "roleName",
+        unique: true,
+        using: "BTREE",
+        fields: [
+          { name: "roleName" },
+        ]
+      },
     ]
   });
-  }
 }

@@ -1,30 +1,35 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Order extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
+export default function(sequelize) {
+  return sequelize.define('Order', {
     orderID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    transactionID: {
+    sessionID: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
-        model: 'Transaction',
-        key: 'transactionID'
+        model: 'ServiceSession',
+        key: 'sessionID'
       }
     },
-    chooseID: {
+    orderNumber: {
       type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    orderedAt: {
+      type: DataTypes.DATE,
       allowNull: true,
-      references: {
-        model: 'Choose',
-        key: 'chooseID'
-      }
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    status: {
+      type: DataTypes.ENUM('NEW','SENT_TO_KITCHEN','COMPLETED','CANCELLED'),
+      allowNull: true,
+      defaultValue: "NEW"
     }
   }, {
     sequelize,
@@ -40,20 +45,28 @@ export default class Order extends Model {
         ]
       },
       {
-        name: "transactionID",
+        name: "uq_sessionID_orderNumber",
+        unique: true,
         using: "BTREE",
         fields: [
-          { name: "transactionID" },
+          { name: "sessionID" },
+          { name: "orderNumber" },
         ]
       },
       {
-        name: "chooseID",
+        name: "idx_sessionID",
         using: "BTREE",
         fields: [
-          { name: "chooseID" },
+          { name: "sessionID" },
+        ]
+      },
+      {
+        name: "idx_Order_status",
+        using: "BTREE",
+        fields: [
+          { name: "status" },
         ]
       },
     ]
   });
-  }
 }

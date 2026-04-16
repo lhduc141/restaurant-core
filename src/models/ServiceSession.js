@@ -2,42 +2,50 @@ import Sequelize from 'sequelize';
 const { DataTypes } = Sequelize;
 
 export default function(sequelize) {
-  return sequelize.define('TableEntity', {
-    tableID: {
+  return sequelize.define('ServiceSession', {
+    sessionID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
       primaryKey: true
     },
-    tabletAccountID: {
+    tableID: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'Account',
-        key: 'accountID'
+        model: 'TableEntity',
+        key: 'tableID'
       }
     },
-    tableName: {
-      type: DataTypes.STRING(50),
+    customerName: {
+      type: DataTypes.STRING(255),
       allowNull: false
     },
-    capacity: {
+    phone: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    guestCount: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
     status: {
-      type: DataTypes.ENUM('VACANT','OCCUPIED'),
+      type: DataTypes.ENUM('OPEN','PAID','CLOSED'),
       allowNull: true,
-      defaultValue: "VACANT"
+      defaultValue: "OPEN"
     },
-    isActive: {
-      type: DataTypes.BOOLEAN,
+    checkInTime: {
+      type: DataTypes.DATE,
       allowNull: true,
-      defaultValue: 1
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    checkOutTime: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     sequelize,
-    tableName: 'TableEntity',
+    tableName: 'ServiceSession',
     timestamps: false,
     indexes: [
       {
@@ -45,18 +53,18 @@ export default function(sequelize) {
         unique: true,
         using: "BTREE",
         fields: [
+          { name: "sessionID" },
+        ]
+      },
+      {
+        name: "idx_tableID",
+        using: "BTREE",
+        fields: [
           { name: "tableID" },
         ]
       },
       {
-        name: "idx_tabletAccountID",
-        using: "BTREE",
-        fields: [
-          { name: "tabletAccountID" },
-        ]
-      },
-      {
-        name: "idx_TableEntity_status",
+        name: "idx_ServiceSession_status",
         using: "BTREE",
         fields: [
           { name: "status" },

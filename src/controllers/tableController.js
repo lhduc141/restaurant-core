@@ -15,7 +15,6 @@ export default class TableController {
     return responseData(res, "successful", data, status);
   }
 
-
   static async registerCustomer(req, res) {
     const { tableID } = req.params; // Extract tableID from route parameter
     const { customerName, phone, age } = req.body; // Extract customer details from request body

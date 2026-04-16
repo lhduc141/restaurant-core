@@ -1,10 +1,9 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+import Sequelize from 'sequelize';
+const { DataTypes } = Sequelize;
 
-export default class Account extends Model {
-  static init(sequelize, DataTypes) {
-  return super.init({
-    userID: {
+export default function(sequelize) {
+  return sequelize.define('Account', {
+    accountID: {
       autoIncrement: true,
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -21,23 +20,28 @@ export default class Account extends Model {
     },
     roleID: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'Role',
         key: 'roleID'
       }
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: 1
     }
   }, {
     sequelize,
     tableName: 'Account',
-    timestamps: false,
+    timestamps: true,
     indexes: [
       {
         name: "PRIMARY",
         unique: true,
         using: "BTREE",
         fields: [
-          { name: "userID" },
+          { name: "accountID" },
         ]
       },
       {
@@ -49,7 +53,7 @@ export default class Account extends Model {
         ]
       },
       {
-        name: "roleID",
+        name: "idx_roleID",
         using: "BTREE",
         fields: [
           { name: "roleID" },
@@ -57,5 +61,4 @@ export default class Account extends Model {
       },
     ]
   });
-  }
 }
