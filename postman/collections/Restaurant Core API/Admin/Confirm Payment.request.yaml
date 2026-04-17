@@ -1,0 +1,12 @@
+$kind: http-request
+name: Confirm Payment
+url: "{{base_url}}/admin/v1/{{admin_id}}/transactions/{{transaction_id}}/confirm-payment"
+method: PATCH
+headers:
+  Authorization: Bearer {{admin_token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {}
+order: 6000

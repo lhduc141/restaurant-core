@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Chosen Items
+url: "{{base_url}}/table/v1/menu/{{session_id}}/choose"
+method: GET
+headers:
+  Authorization: Bearer {{staff_token}}
+order: 4500

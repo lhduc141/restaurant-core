@@ -1,0 +1,14 @@
+$kind: http-request
+name: Update Table Status
+url: "{{base_url}}/admin/v1/{{admin_id}}/tables/{{table_id}}/status"
+method: PATCH
+headers:
+  Authorization: Bearer {{admin_token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "status": "VACANT"
+    }
+order: 1500

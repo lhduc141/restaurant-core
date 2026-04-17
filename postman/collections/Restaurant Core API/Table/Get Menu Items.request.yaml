@@ -1,4 +1,7 @@
 $kind: http-request
+name: Get Menu Items
 url: "{{base_url}}/table/v1/menu-item"
 method: GET
+headers:
+	Authorization: Bearer {{staff_token}}
 order: 2000

@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Bill
+url: "{{base_url}}/table/v1/orders/{{session_id}}/bill"
+method: GET
+headers:
+  Authorization: Bearer {{staff_token}}
+order: 5000

@@ -1,14 +1,17 @@
 $kind: http-request
+name: Edit Menu
 url: "{{base_url}}/admin/v1/edit_menu"
 method: PUT
 headers:
+  Authorization: Bearer {{admin_token}}
   Content-Type: application/json
 body:
   type: text
   content: |-
     {
-      "itemID": 1,
+      "itemID": {{item_id}},
       "itemName": "Updated Dish",
+      "type_of_food": "Main",
       "price": 60
     }
 order: 3000

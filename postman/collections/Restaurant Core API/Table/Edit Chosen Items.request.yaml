@@ -1,7 +1,7 @@
 $kind: http-request
-name: Choose Menu Items
+name: Edit Chosen Items
 url: "{{base_url}}/table/v1/menu/{{session_id}}/choose"
-method: POST
+method: PUT
 headers:
   Authorization: Bearer {{staff_token}}
   Content-Type: application/json
@@ -12,9 +12,10 @@ body:
       "items": [
         {
           "itemID": {{item_id}},
-          "quantity": 2,
-          "note": "Less spicy"
+          "quantity": 1,
+          "note": "No onion",
+          "deleted": false
         }
       ]
     }
-order: 3000
+order: 3500

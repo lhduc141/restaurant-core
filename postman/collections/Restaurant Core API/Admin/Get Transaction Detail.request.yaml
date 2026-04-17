@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Transaction Detail
+url: "{{base_url}}/admin/v1/transaction?transactionID={{transaction_id}}"
+method: GET
+headers:
+  Authorization: Bearer {{admin_token}}
+order: 5500

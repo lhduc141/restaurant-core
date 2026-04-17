@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Table Detail
+url: "{{base_url}}/admin/v1/tables/{{table_id}}"
+method: GET
+headers:
+  Authorization: Bearer {{admin_token}}
+order: 1200
