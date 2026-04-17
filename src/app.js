@@ -19,7 +19,7 @@ const bootstrapDatabase = async () => {
   await sequelize.authenticate();
   console.log("Database connected success");
 
-  const syncMode = (process.env.DB_SYNC_MODE || "alter").trim().toLowerCase();
+  const syncMode = (process.env.DB_SYNC_MODE || "none").trim().toLowerCase();
 
   if (syncMode === "force") {
     throw new Error(
@@ -30,6 +30,8 @@ const bootstrapDatabase = async () => {
   if (syncMode === "alter") {
     await sequelize.sync({ alter: true });
     console.log("Database schema synced with mode: alter");
+  } else {
+    console.log("Database schema sync skipped (mode: none)");
   }
 
   if (syncMode !== "alter" && syncMode !== "none") {

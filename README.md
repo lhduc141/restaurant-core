@@ -46,6 +46,9 @@ Tạo file `.env` từ `.env.example`, sau đó chọn một trong các mode:
 - `DB_SYNC_MODE=none`: không tự động sync schema (dùng DB đúng chuẩn sẵn có).
 - `DB_SYNC_MODE=alter`: tự động cập nhật schema theo model, giữ dữ liệu tối đa.
 
+Mặc định an toàn hiện tại: `DB_SYNC_MODE=none` (không thay đổi schema ngầm khi app boot).
+Chỉ bật `alter` khi cần đồng bộ có kiểm soát ở môi trường dev/demo.
+
 Lưu ý: project đã tắt `DB_SYNC_MODE=force` để tránh xóa dữ liệu ngoài ý muốn.
 
 ### 4. Run backend
