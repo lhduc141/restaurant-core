@@ -21,25 +21,20 @@ const bootstrapDatabase = async () => {
 
   const syncMode = (process.env.DB_SYNC_MODE || "none").trim().toLowerCase();
 
-  if (syncMode === "force") {
+  if (syncMode === "alter" || syncMode === "force") {
     throw new Error(
-      "DB_SYNC_MODE=force is disabled to protect data. Use DB_SYNC_MODE=alter for non-destructive schema sync."
+      "Runtime schema sync is disabled. Remove DB_SYNC_MODE=alter/force and apply migrations before startup."
     );
   }
 
-  if (syncMode === "alter") {
-    await sequelize.sync({ alter: true });
-    console.log("Database schema synced with mode: alter");
-  } else {
-    console.log("Database schema sync skipped (mode: none)");
-  }
-
-  if (syncMode !== "alter" && syncMode !== "none") {
+  if (syncMode !== "none") {
     console.log(`Unknown DB_SYNC_MODE='${syncMode}', fallback to 'none'.`);
   }
 
+  console.log("Runtime schema sync is disabled (migration path only).");
+
   const model = initModels(sequelize);
-  await model.Role.upsert({ roleID: ROLE.STAFF, roleName: "Staff" });
+  await model.Role.upsert({ roleID: ROLE.STAFF, roleName: "Table" });
   await model.Role.upsert({ roleID: ROLE.ADMIN, roleName: "Admin" });
 };
 

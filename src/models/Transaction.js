@@ -43,6 +43,8 @@ export default function(sequelize) {
     sequelize,
     tableName: 'Transaction',
     timestamps: true,
+    createdAt: 'createdAt',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",
