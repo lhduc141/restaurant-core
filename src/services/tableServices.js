@@ -323,6 +323,41 @@ export const editChosenItemsService = async (sessionID, items) => {
 
     const draftOrder = await getDraftOrder(sessionID);
     if (!draftOrder) {
+      // If there is no draft order but item exists in submitted/completed orders,
+      // return business-rule error instead of a generic not-found.
+      const submittedOrders = await model.Order.findAll({
+        where: {
+          sessionID,
+          status: [ORDER_STATUS.SENT_TO_KITCHEN, ORDER_STATUS.COMPLETED],
+        },
+        attributes: ["orderID"],
+      });
+
+      const submittedOrderIDs = submittedOrders.map((entry) => entry.orderID);
+      if (submittedOrderIDs.length > 0) {
+        for (const item of items) {
+          if (!item.itemID) {
+            continue;
+          }
+
+          const submittedItem = await model.OrderItem.findOne({
+            where: {
+              orderID: submittedOrderIDs,
+              itemID: item.itemID,
+              isCancelled: false,
+            },
+            order: [["orderItemID", "DESC"]],
+          });
+
+          if (submittedItem && submittedItem.status !== FOOD_STATUS.ORDERED) {
+            return {
+              error: `Item ${item.itemID} cannot be edited/deleted in status ${submittedItem.status}`,
+              status: 400,
+            };
+          }
+        }
+      }
+
       return { error: "No draft order to edit", status: 404 };
     }
 

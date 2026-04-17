@@ -30,8 +30,8 @@ export default class TableController {
   }
 
   static async getChosenItems(req, res) {
-    const { customerID } = req.params;
-    const { error, data, status } = await service.getChosenItemsService(Number(customerID));
+    const { sessionID } = req.params;
+    const { error, data, status } = await service.getChosenItemsService(Number(sessionID));
 
     if (error) {
       return responseData(res, error, null, status);
@@ -40,9 +40,9 @@ export default class TableController {
   }
 
   static async chooseMenuItems(req, res) {
-    const { customerID } = req.params;
+    const { sessionID } = req.params;
     const { items } = req.body;
-    const { error, data, status } = await service.chooseMenuItemsService(Number(customerID), items);
+    const { error, data, status } = await service.chooseMenuItemsService(Number(sessionID), items);
 
     if (error) {
       return responseData(res, error, null, status);
@@ -51,9 +51,9 @@ export default class TableController {
   }
 
   static async editChosenItems(req, res) {
-    const { customerID } = req.params;
+    const { sessionID } = req.params;
     const { items } = req.body;
-    const { error, data, status } = await service.editChosenItemsService(Number(customerID), items);
+    const { error, data, status } = await service.editChosenItemsService(Number(sessionID), items);
 
     if (error) {
       return responseData(res, error, null, status);
@@ -62,8 +62,8 @@ export default class TableController {
   }
 
   static async submitOrder(req, res) {
-    const { customerID } = req.params;
-    const { error, data, status } = await service.submitOrderService(Number(customerID));
+    const { sessionID } = req.params;
+    const { error, data, status } = await service.submitOrderService(Number(sessionID));
 
     if (error) {
       return responseData(res, error, null, status);
@@ -73,8 +73,8 @@ export default class TableController {
   }
 
   static async getBill(req, res) {
-    const { customerID } = req.params;
-    const { error, data, status } = await service.getBillService(Number(customerID));
+    const { sessionID } = req.params;
+    const { error, data, status } = await service.getBillService(Number(sessionID));
 
     if (error) {
       return responseData(res, error, null, status);
@@ -84,11 +84,11 @@ export default class TableController {
   }
 
   static async checkoutBill(req, res) {
-    const { customerID } = req.params;
+    const { sessionID } = req.params;
     const { payment_method, feedback } = req.body;
 
     const { error, data, status } = await service.checkoutBillService(
-      Number(customerID),
+      Number(sessionID),
       payment_method,
       feedback
     );
