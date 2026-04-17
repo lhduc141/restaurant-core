@@ -1,130 +1,128 @@
 import bcrypt from "bcrypt";
+import Joi from "joi";
 import initModels from "../models/init-models.js";
 import sequelize from "../config/database.js";
-import {
-  checkRefToken,
-  checkToken,
-  createRefToken,
-  createToken,
-  decodeToken,
-} from "../config/jwt.js";
-import Joi from "joi";
+import { createToken } from "../config/jwt.js";
+import { ROLE, TABLE_STATUS } from "../constant/enum.js";
 
-let model = initModels(sequelize);
+const model = initModels(sequelize);
 
-export const signupService = async (
-  role_id,
-  email,
-  password,
-  name,
-  quantity
-) => {
-  // try {
-  //   let check_user = await model.Account.findOne({
-  //     where: { email },
-  //   });
-  //
-  //   if (check_user) {
-  //     return { error: "Email exists, use another email", status: 400 };
-  //   }
-  //
-  //   let hashedPassword = bcrypt.hashSync(password, 10);
-  //   let newUser = await model.Account.create({
-  //     roleID: role_id,
-  //     email,
-  //     password: hashedPassword,
-  //   });
-  //
-  //   let roleDetails = null;
-  //
-  //   switch (role_id) {
-  //     case 1: // Table
-  //       const table = await model.TableEntity.create({
-  //         accountID: newUser.accountID,
-  //         tableName: name,
-  //         quantity: quantity,
-  //         status: 0,
-  //       });
-  //       roleDetails = {
-  //         role: "Table",
-  //         tableName: table.tableName,
-  //         quantity: table.quantity,
-  //       };
-  //       break;
-  //     case 2: // Admin
-  //       const admin = await model.Admin.create({
-  //         accountID: newUser.accountID,
-  //         adminName: name,
-  //       });
-  //       roleDetails = {
-  //         role: "Admin",
-  //         adminName: admin.adminName,
-  //       };
-  //       break;
-  //   }
-  //
-  //   return {
-  //     data: {
-  //       accountID: newUser.accountID,
-  //       roleID: newUser.roleID,
-  //       email: newUser.email,
-  //       role_details: roleDetails,
-  //     },
-  //     status: 200,
-  //   };
-  // } catch (error) {
-  //   console.error(error);
-  //   return { error: "Error creating user", status: 500 };
-  // }
+const signupSchema = Joi.object({
+  role_id: Joi.number().valid(ROLE.STAFF, ROLE.ADMIN).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  name: Joi.string().min(1).required(),
+  quantity: Joi.number().integer().min(1).optional(),
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
+});
+
+export const signupService = async (role_id, email, password, name, quantity) => {
+  const { error } = signupSchema.validate({ role_id, email, password, name, quantity });
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    const existing = await model.Account.findOne({ where: { email } });
+    if (existing) {
+      return { error: "Email exists, use another email", status: 400 };
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const account = await model.Account.create({
+      roleID: role_id,
+      email,
+      password: hashedPassword,
+    });
+
+    let roleDetails = null;
+
+    if (role_id === ROLE.STAFF) {
+      const table = await model.TableEntity.create({
+        tabletAccountID: account.accountID,
+        tableName: name,
+        capacity: quantity || 2,
+        status: TABLE_STATUS.VACANT,
+      });
+
+      roleDetails = {
+        role: "Staff",
+        tableID: table.tableID,
+        tableName: table.tableName,
+        capacity: table.capacity,
+      };
+    }
+
+    if (role_id === ROLE.ADMIN) {
+      const admin = await model.Admin.create({
+        accountID: account.accountID,
+        adminName: name,
+      });
+
+      roleDetails = {
+        role: "Admin",
+        adminID: admin.adminID,
+        adminName: admin.adminName,
+      };
+    }
+
+    return {
+      data: {
+        accountID: account.accountID,
+        roleID: account.roleID,
+        email: account.email,
+        roleDetails,
+      },
+      status: 201,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error creating user", status: 500 };
+  }
 };
 
 export const loginService = async (email, password) => {
-  // const schema = Joi.object({
-  //   email: Joi.string().email().required().messages({
-  //     "string.email": "Invalid email format",
-  //     "any.required": "Email is required",
-  //   }),
+  const { error } = loginSchema.validate({ email, password });
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
 
-  //   password: Joi.string().min(8).required().messages({
-  //     "string.min": "Password must be at least 8 characters long",
-  //     "any.required": "Password is required",
-  //   }),
-  // });
-  // Validate the input
-  // const { error } = schema.validate({ email, password });
+  try {
+    const account = await model.Account.findOne({ where: { email } });
+    if (!account) {
+      return { error: "Incorrect email or password", status: 401 };
+    }
 
-  // if (error) {
-  //   return { error: error.details[0].message, status: 400 };
-  // }
-  // try {
-  //   let check_user = await model.Account.findOne({
-  //     where: { email },
-  //   });
-  //
-  //   if (!check_user) {
-  //     return { error: "Incorrect email or password", status: 400 };
-  //   }
-  //
-  //   if (check_user && bcrypt.compareSync(password, check_user.password)) {
-  //     if (check_user.roleID == 1) {
-  //       let table = await model.TableEntity.findOne({
-  //         where: { accountID: check_user.accountID },
-  //       });
-  //       let token = {
-  //         accountID: check_user.accountID,
-  //         tableID: table.tableID,
-  //         roleID: check_user.roleID,
-  //       };
-  //       return { data: token, status: 200 };
-  //     } else {
-  //       let token = { accountID: check_user.accountID, roleID: check_user.roleID };
-  //       return { data: token, status: 200 };
-  //     }
-  //   } else {
-  //     return { error: "Incorrect email or password", status: 400 };
-  //   }
-  // } catch (error) {
-  //   console.error(error);
-  //   return { error: "Error logging in", status: 500 };
-  // }
+    const isValidPassword = bcrypt.compareSync(password, account.password);
+    if (!isValidPassword) {
+      return { error: "Incorrect email or password", status: 401 };
+    }
+
+    let table = null;
+    if (account.roleID === ROLE.STAFF) {
+      table = await model.TableEntity.findOne({ where: { tabletAccountID: account.accountID } });
+    }
+
+    const payload = {
+      accountID: account.accountID,
+      roleID: account.roleID,
+      tableID: table?.tableID || null,
+    };
+
+    const accessToken = createToken(payload, "1d");
+    return {
+      data: {
+        accessToken,
+        user: payload,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error logging in", status: 500 };
+  }
 };

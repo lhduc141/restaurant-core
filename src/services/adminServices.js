@@ -1,396 +1,474 @@
-import bcrypt from "bcrypt";
+import Joi from "joi";
+import { Op } from "sequelize";
 import initModels from "../models/init-models.js";
 import sequelize from "../config/database.js";
 import {
-  checkRefToken,
-  checkToken,
-  createRefToken,
-  createToken,
-  decodeToken,
-} from "../config/jwt.js";
-import Joi from "joi";
-import { Sequelize } from "sequelize";
-let Op = Sequelize.Op;
+  FOOD_STATUS,
+  FOOD_STATUS_FLOW,
+  ORDER_STATUS,
+  PAYMENT_STATUS,
+  SESSION_STATUS,
+  TABLE_STATUS,
+} from "../constant/enum.js";
 
-let model = initModels(sequelize);
+const model = initModels(sequelize);
 
-export const signupService = async (
-  role_id,
-  email,
-  password,
-  name,
-  quantity
-) => {
-  // try {
-  //   let check_user = await model.Account.findOne({
-  //     where: { email },
-  //   });
-  //
-  //   if (check_user) {
-  //     return { error: "Email exists, use another email", status: 400 };
-  //   }
-  //
-  //   let hashedPassword = bcrypt.hashSync(password, 10);
-  //   let newUser = await model.Account.create({
-  //     roleID: role_id,
-  //     email,
-  //     password: hashedPassword,
-  //   });
-  //
-  //   let roleDetails = null;
-  //
-  //   switch (role_id) {
-  //     case 1: // Table
-  //       const table = await model.TableEntity.create({
-  //         accountID: newUser.accountID,
-  //         tableName: name,
-  //         quantity: quantity,
-  //         status: 0,
-  //       });
-  //       roleDetails = {
-  //         role: "Table",
-  //         tableName: table.tableName,
-  //         quantity: table.quantity,
-  //       };
-  //       break;
-  //     case 2: // Admin
-  //       const admin = await model.Admin.create({
-  //         accountID: newUser.accountID,
-  //         adminName: name,
-  //       });
-  //       roleDetails = {
-  //         role: "Admin",
-  //         adminName: admin.adminName,
-  //       };
-  //       break;
-  //   }
-  //
-  //   return {
-  //     data: {
-  //       accountID: newUser.accountID,
-  //       roleID: newUser.roleID,
-  //       email: newUser.email,
-  //       role_details: roleDetails,
-  //     },
-  //     status: 200,
-  //   };
-  // } catch (error) {
-  //   console.error(error);
-  //   return { error: "Error creating user", status: 500 };
-  // }
+const statusUpdateSchema = Joi.object({
+  chooseID: Joi.number().integer().required(),
+  status: Joi.string()
+    .valid(FOOD_STATUS.PREPARING, FOOD_STATUS.IN_PROGRESS, FOOD_STATUS.SERVED)
+    .required(),
+});
+
+const editMenuSchema = Joi.object({
+  itemID: Joi.number().integer().required(),
+  itemName: Joi.string().optional(),
+  type_of_food: Joi.string().optional(),
+  price: Joi.number().min(0).optional(),
+  descriptions: Joi.string().allow(null, "").optional(),
+  preparation_time: Joi.number().integer().min(0).optional(),
+});
+
+const addMenuSchema = Joi.object({
+  itemName: Joi.string().required(),
+  type_of_food: Joi.string().required(),
+  price: Joi.number().min(0).required(),
+  descriptions: Joi.string().allow(null, "").optional(),
+  preparation_time: Joi.number().integer().min(0).required(),
+  image: Joi.string().allow(null, "").optional(),
+});
+
+const getAdminByID = async (adminID) => {
+  const admin = await model.Admin.findByPk(adminID);
+  if (!admin) {
+    return { error: "Admin not found", status: 404 };
+  }
+  return { admin };
 };
 
-export const loginService = async (email, password) => {
-  // // const schema = Joi.object({
-  // //   email: Joi.string().email().required().messages({
-  // //     "string.email": "Invalid email format",
-  // //     "any.required": "Email is required",
-  // //   }),
-  //
-  // //   password: Joi.string().min(8).required().messages({
-  // //     "string.min": "Password must be at least 8 characters long",
-  // //     "any.required": "Password is required",
-  // //   }),
-  // // });
-  // // Validate the input
-  // // const { error } = schema.validate({ email, password });
-  //
-  // // if (error) {
-  // //   return { error: error.details[0].message, status: 400 };
-  // // }
-  // try {
-  //   let check_user = await model.Account.findOne({
-  //     where: { email },
-  //   });
-  //
-  //   if (!check_user) {
-  //     return { error: "Incorrect email or password", status: 400 };
-  //   }
-  //
-  //   if (check_user && bcrypt.compareSync(password, check_user.password)) {
-  //     if (check_user.roleID === 1) {
-  //       let table = await model.TableEntity.findOne({
-  //         where: { accountID: check_user.accountID },
-  //       });
-  //       let token = {
-  //         accountID: check_user.accountID,
-  //         tableID: table.tableID,
-  //       };
-  //       return { data: token, status: 200 };
-  //     } else {
-  //       let token = { accountID: check_user.accountID };
-  //       return { data: token, status: 200 };
-  //     }
-  //   } else {
-  //     return { error: "Incorrect email or password", status: 400 };
-  //   }
-  // } catch (error) {
-  //   console.error(error);
-  //   return { error: "Error logging in", status: 500 };
-  // }
+const summarizeSession = async (sessionID) => {
+  const orders = await model.Order.findAll({
+    where: { sessionID },
+    include: [
+      {
+        model: model.OrderItem,
+        as: "OrderItems",
+        where: { isCancelled: false },
+        required: false,
+        include: [
+          {
+            model: model.MenuItem,
+            as: "item",
+            attributes: ["itemName", "typeOfFood", "preparationTime"],
+          },
+        ],
+      },
+    ],
+    order: [["orderID", "ASC"]],
+  });
+
+  const orderedItems = [];
+  let totalDishCount = 0;
+  let totalBill = 0;
+
+  for (const order of orders) {
+    for (const item of order.OrderItems || []) {
+      const quantity = Number(item.quantity || 0);
+      const lineTotal = Number(item.lineTotal || 0);
+
+      totalDishCount += quantity;
+      totalBill += lineTotal;
+
+      orderedItems.push({
+        chooseID: item.orderItemID,
+        orderItemID: item.orderItemID,
+        orderID: order.orderID,
+        itemID: item.itemID,
+        itemName: item.item?.itemName || null,
+        type_of_food: item.item?.typeOfFood || null,
+        quantity,
+        note: item.note,
+        status: item.status,
+        lineTotal,
+        preparation_time: item.item?.preparationTime ?? null,
+      });
+    }
+  }
+
+  return {
+    totalDishCount,
+    totalBill,
+    orderedItems,
+  };
 };
 
 export const editStatusOfMenuItemsService = async (adminID, items) => {
-  // try {
-  //   const admin = await model.Admin.findOne({
-  //     where: {
-  //       AdminID: adminID,
-  //     },
-  //   });
-  //   if (!admin) {
-  //     return {
-  //       error: `Admin ID ${admin.AdminID} doesn't exist`,
-  //       status: 404,
-  //     };
-  //   }
-  //   const updatedItems = [];
-  //
-  //   for (const item of items) {
-  //     const { chooseID, status } = item;
-  //     // Find the chosen item
-  //     const chosenItem = await model.OrderItem.findOne({
-  //       where: {
-  //         chooseID,
-  //       },
-  //     });
-  //
-  //     if (!chosenItem) {
-  //       return {
-  //         error: `Item with ID ${chosenItem.itemID} either does not belong to customer ${customerID} or is not in 'order' status`,
-  //         status: 404,
-  //       };
-  //     }
-  //
-  //     // Update status of the chosen item
-  //     chosenItem.status = status; // Update status if provided
-  //
-  //     await chosenItem.save();
-  //
-  //     updatedItems.push(chosenItem);
-  //   }
-  //
-  //   return { data: updatedItems, status: 200 };
-  // } catch (err) {
-  //   console.error(err);
-  //   return { error: "Error editing menu items ", status: 500 };
-  // }
+  try {
+    const { error: adminError, status } = await getAdminByID(adminID);
+    if (adminError) {
+      return { error: adminError, status };
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return { error: "items must be a non-empty array", status: 400 };
+    }
+
+    const updated = [];
+
+    for (const item of items) {
+      const { error } = statusUpdateSchema.validate(item);
+      if (error) {
+        return { error: error.details[0].message, status: 400 };
+      }
+
+      const orderItem = await model.OrderItem.findByPk(item.chooseID);
+      if (!orderItem) {
+        return { error: `Order item ${item.chooseID} not found`, status: 404 };
+      }
+
+      if (orderItem.isCancelled) {
+        return { error: `Order item ${item.chooseID} is cancelled`, status: 400 };
+      }
+
+      const expectedNextStatus = FOOD_STATUS_FLOW[orderItem.status];
+      if (expectedNextStatus !== item.status) {
+        return {
+          error: `Invalid transition for item ${item.chooseID}. Allowed: ${orderItem.status} -> ${expectedNextStatus || "N/A"}`,
+          status: 400,
+        };
+      }
+
+      orderItem.status = item.status;
+      await orderItem.save();
+
+      // Mark order as completed when all non-cancelled items are served.
+      const siblingItems = await model.OrderItem.findAll({
+        where: { orderID: orderItem.orderID, isCancelled: false },
+      });
+      if (siblingItems.length > 0 && siblingItems.every((entry) => entry.status === FOOD_STATUS.SERVED)) {
+        const order = await model.Order.findByPk(orderItem.orderID);
+        if (order) {
+          order.status = ORDER_STATUS.COMPLETED;
+          await order.save();
+        }
+      }
+
+      updated.push({
+        chooseID: orderItem.orderItemID,
+        status: orderItem.status,
+      });
+    }
+
+    return { data: updated, status: 200 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error updating food status", status: 500 };
+  }
 };
 
-export const getItemsOfTablesService = async () => {
-  // try {
-  //   // Step 1: Fetch all tables with status = 1 (ongoing)
-  //   const ongoingTables = await model.TableEntity.findAll({
-  //     where: { status: 1 }, // Status = 1 means ongoing
-  //     include: [
-  //       {
-  //         model: model.ServiceSession,
-  //         as: "Customers", // Assuming the association is set
-  //         attributes: ["customerID"],
-  //         order: [["customerID", "DESC"]], // Get the latest customerID
-  //         limit: 1, // Fetch only the latest customer for each table
-  //       },
-  //     ],
-  //   });
-  //   console.log(ongoingTables);
-  //   if (!ongoingTables.length) {
-  //     return { error: "No ongoing tables found.", status: 404 };
-  //   }
-  //
-  //   const results = [];
-  //
-  //   // Step 2: Loop through each table to fetch Choose data for the latest customerID
-  //   for (const table of ongoingTables) {
-  //     const latestCustomer = table.Customers[0];
-  //     if (latestCustomer) {
-  //       const chooseData = await model.OrderItem.findAll({
-  //         where: { customerID: latestCustomer.customerID, deleted: 0 },
-  //         include: [
-  //           {
-  //             model: model.MenuItem,
-  //             as: "item", // Assuming a proper association exists
-  //             attributes: ["itemName", "price", "preparation_time"],
-  //           },
-  //         ],
-  //       });
-  //       console.log(JSON.stringify(chooseData, null, 2)); // Debugging output
-  //
-  //       // Format data for each table
-  //       results.push({
-  //         tableID: table.tableID,
-  //         tableName: table.tableName,
-  //         customerID: latestCustomer.customerID,
-  //         chooseItems: chooseData.map((item) => ({
-  //           chooseID: item.chooseID,
-  //           itemID: item.itemID,
-  //           itemName: item.item?.itemName || null,
-  //           quantity: item.quantity,
-  //           note: item.note || null,
-  //           price: item.item?.price,
-  //           status: item.status,
-  //           preparation_time: item.item?.preparation_time || null,
-  //         })),
-  //       });
-  //     }
-  //   }
-  //
-  //   return { data: results, status: 200 };
-  // } catch (err) {
-  //   console.error(err);
-  //   return { error: "Error editing menu items ", status: 500 };
-  // }
+export const getItemsOfTablesService = async (quantity) => {
+  try {
+    const where = quantity ? { capacity: quantity } : {};
+    const tables = await model.TableEntity.findAll({
+      where,
+      order: [["tableID", "ASC"]],
+    });
+
+    const result = [];
+
+    for (const table of tables) {
+      const activeSession = await model.ServiceSession.findOne({
+        where: {
+          tableID: table.tableID,
+          status: [SESSION_STATUS.OPEN, SESSION_STATUS.PAID],
+        },
+        order: [["sessionID", "DESC"]],
+      });
+
+      const summary = activeSession
+        ? await summarizeSession(activeSession.sessionID)
+        : { totalDishCount: 0, totalBill: 0, orderedItems: [] };
+
+      result.push({
+        tableID: table.tableID,
+        tableName: table.tableName,
+        capacity: table.capacity,
+        status: table.status,
+        activeSession: activeSession
+          ? {
+              sessionID: activeSession.sessionID,
+              customerID: activeSession.sessionID,
+              customerName: activeSession.customerName,
+              phone: activeSession.phone,
+              guestCount: activeSession.guestCount,
+              checkInTime: activeSession.checkInTime,
+              status: activeSession.status,
+            }
+          : null,
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+        orderedItems: summary.orderedItems,
+      });
+    }
+
+    return { data: result, status: 200 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching table overview", status: 500 };
+  }
+};
+
+export const getTableDetailService = async (tableID) => {
+  try {
+    const table = await model.TableEntity.findByPk(tableID);
+    if (!table) {
+      return { error: "Table not found", status: 404 };
+    }
+
+    const activeSession = await model.ServiceSession.findOne({
+      where: {
+        tableID,
+        status: [SESSION_STATUS.OPEN, SESSION_STATUS.PAID],
+      },
+      order: [["sessionID", "DESC"]],
+    });
+
+    const summary = activeSession
+      ? await summarizeSession(activeSession.sessionID)
+      : { totalDishCount: 0, totalBill: 0, orderedItems: [] };
+
+    return {
+      data: {
+        tableID: table.tableID,
+        tableName: table.tableName,
+        capacity: table.capacity,
+        status: table.status,
+        activeSession: activeSession
+          ? {
+              sessionID: activeSession.sessionID,
+              customerID: activeSession.sessionID,
+              customerName: activeSession.customerName,
+              phone: activeSession.phone,
+              guestCount: activeSession.guestCount,
+              checkInTime: activeSession.checkInTime,
+              status: activeSession.status,
+            }
+          : null,
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+        orderedItems: summary.orderedItems,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching table detail", status: 500 };
+  }
+};
+
+export const updateTableStatusService = async (adminID, tableID, status) => {
+  try {
+    const { error: adminError, status: adminStatus } = await getAdminByID(adminID);
+    if (adminError) {
+      return { error: adminError, status: adminStatus };
+    }
+
+    if (![TABLE_STATUS.VACANT, TABLE_STATUS.OCCUPIED].includes(status)) {
+      return { error: "Invalid table status", status: 400 };
+    }
+
+    const table = await model.TableEntity.findByPk(tableID);
+    if (!table) {
+      return { error: "Table not found", status: 404 };
+    }
+
+    const activeSession = await model.ServiceSession.findOne({
+      where: {
+        tableID,
+        status: [SESSION_STATUS.OPEN, SESSION_STATUS.PAID],
+      },
+    });
+
+    if (status === TABLE_STATUS.VACANT && activeSession) {
+      return {
+        error: "Cannot set VACANT while session is active",
+        status: 400,
+      };
+    }
+
+    if (status === TABLE_STATUS.OCCUPIED && !activeSession) {
+      return {
+        error: "Cannot set OCCUPIED without active session",
+        status: 400,
+      };
+    }
+
+    table.status = status;
+    await table.save();
+
+    return {
+      data: {
+        tableID: table.tableID,
+        status: table.status,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error updating table status", status: 500 };
+  }
 };
 
 export const viewDetailTransactionService = async (transactionID) => {
-  // try {
-  //   // Fetch all orders associated with the transactionID
-  //   const orders = await model.Order.findAll({
-  //     where: { transactionID },
-  //     include: [
-  //       {
-  //         model: model.OrderItem,
-  //         as: "choose", // Assuming proper association between Order and Choose
-  //         include: [
-  //           {
-  //             model: model.MenuItem,
-  //             as: "item", // Assuming association with Menu_Item
-  //             attributes: ["itemID", "itemName", "preparation_time", "price"], // Fetch item details
-  //           },
-  //         ],
-  //       },
-  //     ],
-  //   });
-  //
-  //   const items = {};
-  //
-  //   // Iterate through orders
-  //   orders.forEach((order) => {
-  //     const chooseEntries = Array.isArray(order.choose)
-  //       ? order.choose
-  //       : [order.choose];
-  //     chooseEntries.forEach((choice) => {
-  //       if (!choice) return; // Skip if choose is null
-  //
-  //       const { itemID, quantity, price, item } = choice;
-  //
-  //       // Group data by itemID
-  //       if (!items[itemID]) {
-  //         items[itemID] = {
-  //           itemID,
-  //           itemName: item.itemName,
-  //           preparation_time: item.preparation_time,
-  //           quantity: 0,
-  //           totalPrice: 0,
-  //         };
-  //       }
-  //
-  //       // Aggregate data
-  //       items[itemID].quantity += quantity;
-  //       items[itemID].totalPrice += price;
-  //     });
-  //   });
-  //
-  //   // Format the aggregated data into an array
-  //   const formattedItems = Object.values(items);
-  //
-  //   // Fetch transaction metadata
-  //   const transaction = await model.Transaction.findOne({
-  //     where: { transactionID },
-  //     attributes: [
-  //       "transactionID",
-  //       "customerID",
-  //       "payment_method",
-  //       "date",
-  //       "totalPrice",
-  //     ],
-  //   });
-  //
-  //   if (!transaction) {
-  //     return { error: "Transaction not found", status: 404 };
-  //   }
-  //
-  //   // Combine transaction metadata with formatted items
-  //   return {
-  //     data: {
-  //       transactionID: transaction.transactionID,
-  //       customerID: transaction.customerID,
-  //       payment_method: transaction.payment_method,
-  //       date: transaction.date,
-  //       totalPrice: transaction.totalPrice,
-  //       items: formattedItems,
-  //     },
-  //     status: 200,
-  //   };
-  // } catch (err) {
-  //   console.error(err);
-  //   return { error: "Error editing menu items ", status: 500 };
-  // }
+  try {
+    const transaction = await model.Transaction.findByPk(transactionID);
+    if (!transaction) {
+      return { error: "Transaction not found", status: 404 };
+    }
+
+    const session = await model.ServiceSession.findByPk(transaction.sessionID);
+    const summary = await summarizeSession(transaction.sessionID);
+
+    return {
+      data: {
+        transactionID: transaction.transactionID,
+        customerID: transaction.sessionID,
+        sessionID: transaction.sessionID,
+        payment_method: transaction.paymentMethod,
+        paymentStatus: transaction.paymentStatus,
+        totalPrice: Number(transaction.totalPrice || 0),
+        feedback: transaction.feedback,
+        paidAt: transaction.paidAt,
+        customerName: session?.customerName || null,
+        tableID: session?.tableID || null,
+        items: summary.orderedItems,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching transaction detail", status: 500 };
+  }
+};
+
+export const confirmPaymentService = async (adminID, transactionID) => {
+  try {
+    const { error: adminError, status: adminStatus } = await getAdminByID(adminID);
+    if (adminError) {
+      return { error: adminError, status: adminStatus };
+    }
+
+    const transaction = await model.Transaction.findByPk(transactionID);
+    if (!transaction) {
+      return { error: "Transaction not found", status: 404 };
+    }
+
+    if (transaction.paymentStatus !== PAYMENT_STATUS.PENDING) {
+      return { error: "Only pending transactions can be confirmed", status: 400 };
+    }
+
+    const session = await model.ServiceSession.findByPk(transaction.sessionID);
+    if (!session) {
+      return { error: "Session not found", status: 404 };
+    }
+
+    transaction.paymentStatus = PAYMENT_STATUS.PAID;
+    transaction.paidAt = new Date();
+    await transaction.save();
+
+    session.status = SESSION_STATUS.CLOSED;
+    session.checkOutTime = new Date();
+    await session.save();
+
+    const table = await model.TableEntity.findByPk(session.tableID);
+    if (table) {
+      table.status = TABLE_STATUS.VACANT;
+      await table.save();
+    }
+
+    return {
+      data: {
+        transactionID: transaction.transactionID,
+        paymentStatus: transaction.paymentStatus,
+        paidAt: transaction.paidAt,
+        sessionID: session.sessionID,
+        sessionStatus: session.status,
+        tableID: session.tableID,
+        tableStatus: table ? table.status : null,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error confirming payment", status: 500 };
+  }
 };
 
 export const getDailyRevenueService = async (date) => {
-  // try {
-  //   if (!date) {
-  //     return { error: "Date is required in the request body.", status: 400 };
-  //   }
-  //
-  //   // Format the date for filtering (start and end of the day)
-  //   const startDate = new Date(date);
-  //   startDate.setHours(0, 0, 0, 0); // Set to start of the day
-  //
-  //   const endDate = new Date(date);
-  //   endDate.setHours(23, 59, 59, 999); // Set to end of the day
-  //
-  //   // Fetch total revenue for the given date
-  //   const totalRevenue = await model.Transaction.sum("totalPrice", {
-  //     where: {
-  //       date: {
-  //         [Op.between]: [startDate, endDate],
-  //       },
-  //     },
-  //   });
-  //
-  //   return {
-  //     data: {
-  //       date: date,
-  //       totalRevenue: totalRevenue || 0, // Return 0 if no transactions found
-  //     },
-  //     status: 200,
-  //   };
-  // } catch (err) {
-  //   console.error(err);
-  //   return { error: "Failed to fetch daily revenue.", status: 500 };
-  // }
+  try {
+    const targetDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(targetDate.getTime())) {
+      return { error: "Invalid date format", status: 400 };
+    }
+
+    const startDate = new Date(targetDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(targetDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    const totalRevenue = await model.Transaction.sum("totalPrice", {
+      where: {
+        paymentStatus: PAYMENT_STATUS.PAID,
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+    });
+
+    return {
+      data: {
+        date: startDate.toISOString().slice(0, 10),
+        totalRevenue: Number(totalRevenue || 0),
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Failed to fetch daily revenue", status: 500 };
+  }
 };
+
 export const listTablesService = async (quantity) => {
-  // try {
-  //   // Build where conditions dynamically
-  //   const whereCondition = quantity ? { quantity } : {};
-  //
-  //   // Fetch tables grouped by status
-  //   const vacantTables = await model.TableEntity.findAll({
-  //     where: { ...whereCondition, status: 0 }, // Status 0: Vacant
-  //     attributes: ["tableID", "tableName", "quantity"], // Only return required fields
-  //   });
-  //
-  //   const ongoingTables = await model.TableEntity.findAll({
-  //     where: { ...whereCondition, status: 1 }, // Status 1: Ongoing
-  //     attributes: ["tableID", "tableName", "quantity"], // Only return required fields
-  //   });
-  //
-  //   // Combine the results into a grouped response
-  //   return {
-  //     data: {
-  //       vacant: vacantTables,
-  //       ongoing: ongoingTables,
-  //     },
-  //     status: 200,
-  //   };
-  // } catch (err) {
-  //   console.error(err);
-  //   return {
-  //     error: "Failed to fetch tables by status and quantity.",
-  //     status: 500,
-  //   };
-  // }
+  try {
+    const whereCondition = quantity ? { capacity: quantity } : {};
+
+    const vacant = await model.TableEntity.findAll({
+      where: { ...whereCondition, status: TABLE_STATUS.VACANT },
+      order: [["tableID", "ASC"]],
+      attributes: ["tableID", "tableName", "capacity"],
+    });
+
+    const ongoing = await model.TableEntity.findAll({
+      where: { ...whereCondition, status: TABLE_STATUS.OCCUPIED },
+      order: [["tableID", "ASC"]],
+      attributes: ["tableID", "tableName", "capacity"],
+    });
+
+    return {
+      data: {
+        vacant,
+        ongoing,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return {
+      error: "Failed to fetch tables by status",
+      status: 500,
+    };
+  }
 };
 
 export const editMenuService = async (
@@ -401,34 +479,38 @@ export const editMenuService = async (
   descriptions,
   preparation_time
 ) => {
-  // try {
-  //   // Check if the item exists
-  //   const menuItem = await model.MenuItem.findByPk(itemID);
-  //   if (!menuItem) {
-  //     return {
-  //       error: `Menu item with ID ${itemID} not found`,
-  //       data: null,
-  //       status: 404,
-  //     };
-  //   }
-  //
-  //   // Update the menu item
-  //   await menuItem.update({
-  //     itemName: itemName || menuItem.itemName, // Retain the old value if not provided
-  //     type_of_food: type_of_food || menuItem.type_of_food,
-  //     price: price !== undefined ? price : menuItem.price, // Check against undefined for numeric fields
-  //     descriptions: descriptions || menuItem.descriptions,
-  //     preparation_time:
-  //       preparation_time !== undefined
-  //         ? preparation_time
-  //         : menuItem.preparation_time,
-  //   });
-  //
-  //   return { data: menuItem, status: 200 };
-  // } catch (error) {
-  //   console.error("Error updating menu item:", error);
-  //   return { error: "Internal Server Error", status: 500 };
-  // }
+  const { error } = editMenuSchema.validate({
+    itemID,
+    itemName,
+    type_of_food,
+    price,
+    descriptions,
+    preparation_time,
+  });
+
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    const menuItem = await model.MenuItem.findByPk(itemID);
+    if (!menuItem) {
+      return { error: `Menu item with ID ${itemID} not found`, status: 404 };
+    }
+
+    await menuItem.update({
+      itemName: itemName ?? menuItem.itemName,
+      typeOfFood: type_of_food ?? menuItem.typeOfFood,
+      price: price ?? menuItem.price,
+      descriptions: descriptions ?? menuItem.descriptions,
+      preparationTime: preparation_time ?? menuItem.preparationTime,
+    });
+
+    return { data: menuItem, status: 200 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Internal server error", status: 500 };
+  }
 };
 
 export const addNewFoodService = async (
@@ -439,26 +521,33 @@ export const addNewFoodService = async (
   preparation_time,
   image
 ) => {
-  // try {
-  //   // Validate input (you can expand this based on your requirements)
-  //   if (!itemName || price === undefined || preparation_time === undefined) {
-  //     return { error: "Missing required fields", data: null, status: 400 };
-  //   }
-  //
-  //   // Create the new food item in the Menu_Item table
-  //   const newFoodItem = await model.MenuItem.create({
-  //     itemName,
-  //     type_of_food: type_of_food || null, // Optional field
-  //     price,
-  //     descriptions: descriptions || null, // Optional field
-  //     preparation_time,
-  //     image,
-  //     status: true,
-  //   });
-  //
-  //   return { error: null, data: newFoodItem, status: 201 };
-  // } catch (error) {
-  //   console.error("Error adding new food item:", error);
-  //   return { error: "Internal Server Error", data: null, status: 500 };
-  // }
+  const { error } = addMenuSchema.validate({
+    itemName,
+    type_of_food,
+    price,
+    descriptions,
+    preparation_time,
+    image,
+  });
+
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    const newFoodItem = await model.MenuItem.create({
+      itemName,
+      typeOfFood: type_of_food,
+      price,
+      descriptions: descriptions || null,
+      preparationTime: preparation_time,
+      image: image || null,
+      status: true,
+    });
+
+    return { data: newFoodItem, status: 201 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Internal server error", status: 500 };
+  }
 };

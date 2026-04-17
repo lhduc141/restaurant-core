@@ -1,388 +1,546 @@
-import bcrypt from "bcrypt";
+import Joi from "joi";
 import initModels from "../models/init-models.js";
 import sequelize from "../config/database.js";
 import {
-  checkRefToken,
-  checkToken,
-  createRefToken,
-  createToken,
-  decodeToken,
-} from "../config/jwt.js";
-import Joi from "joi";
-import { Sequelize } from "sequelize";
-let Op = Sequelize.Op;
-let model = initModels(sequelize);
+  FOOD_STATUS,
+  ORDER_STATUS,
+  PAYMENT_METHOD,
+  PAYMENT_STATUS,
+  ROLE,
+  SESSION_STATUS,
+  TABLE_STATUS,
+} from "../constant/enum.js";
 
-export const signupService = async (
-  role_id,
-  email,
-  password,
-  name,
-  quantity
-) => {
-  // try {
-  //   let check_user = await model.Account.findOne({
-  //     where: { email },
-  //   });
-  //
-  //   if (check_user) {
-  //     return { error: "Email exists, use another email", status: 400 };
-  //   }
-  //
-  //   let hashedPassword = bcrypt.hashSync(password, 10);
-  //   let newUser = await model.Account.create({
-  //     roleID: role_id,
-  //     email,
-  //     password: hashedPassword,
-  //   });
-  //
-  //   let roleDetails = null;
-  //
-  //   switch (role_id) {
-  //     case 1: // Table
-  //       const table = await model.TableEntity.create({
-  //         accountID: newUser.accountID,
-  //         tableName: name,
-  //         quantity: quantity,
-  //         status: 0,
-  //       });
-  //       roleDetails = {
-  //         role: "Table",
-  //         tableName: table.tableName,
-  //         quantity: table.quantity
-  //       };
-  //       break;
-  //     case 2: // Admin
-  //       const admin = await model.Admin.create({
-  //         accountID: newUser.accountID,
-  //         adminName: name
-  //       });
-  //       roleDetails = {
-  //         role: "Admin",
-  //         adminName: admin.adminName
-  //       };
-  //       break;
-  //   }
-  //
-  //   return {
-  //     data: {
-  //       accountID: newUser.accountID,
-  //       roleID: newUser.roleID,
-  //       email: newUser.email,
-  //       role_details: roleDetails
-  //     },
-  //     status: 200
-  //   };
-  // } catch (error) {
-  //   console.error(error);
-  //   return { error: "Error creating user", status: 500 };
-  // }
+const model = initModels(sequelize);
+
+const startSessionSchema = Joi.object({
+  customerName: Joi.string().min(1).required(),
+  phone: Joi.string().allow("", null).optional(),
+  guestCount: Joi.number().integer().min(1).required(),
+  tableID: Joi.number().integer().required(),
+});
+
+const orderItemsSchema = Joi.array()
+  .items(
+    Joi.object({
+      itemID: Joi.number().integer().required(),
+      quantity: Joi.number().integer().min(1).required(),
+      note: Joi.string().allow("", null).optional(),
+    })
+  )
+  .min(1)
+  .required();
+
+const checkoutSchema = Joi.object({
+  payment_method: Joi.string()
+    .valid(PAYMENT_METHOD.CASH, PAYMENT_METHOD.CARD, PAYMENT_METHOD.TRANSFER, PAYMENT_METHOD.OTHER)
+    .required(),
+  feedback: Joi.string().allow("", null).optional(),
+});
+
+const mapSessionResponse = (session) => ({
+  customerID: session.sessionID,
+  sessionID: session.sessionID,
+  tableID: session.tableID,
+  customerName: session.customerName,
+  phone: session.phone,
+  guestCount: session.guestCount,
+  checkInTime: session.checkInTime,
+  status: session.status,
+});
+
+const getSessionByID = async (sessionID) => {
+  const session = await model.ServiceSession.findByPk(sessionID);
+  if (!session) {
+    return { error: "Session not found", status: 404 };
+  }
+  return { session };
+};
+
+const getDraftOrder = async (sessionID) => {
+  return model.Order.findOne({
+    where: {
+      sessionID,
+      status: ORDER_STATUS.NEW,
+    },
+    order: [["orderID", "DESC"]],
+  });
+};
+
+const getNextOrderNumber = async (sessionID) => {
+  const latest = await model.Order.findOne({
+    where: { sessionID },
+    order: [["orderNumber", "DESC"]],
+  });
+  return latest ? latest.orderNumber + 1 : 1;
+};
+
+const summarizeSubmittedItems = async (sessionID) => {
+  const orders = await model.Order.findAll({
+    where: {
+      sessionID,
+      status: [ORDER_STATUS.SENT_TO_KITCHEN, ORDER_STATUS.COMPLETED],
+    },
+    include: [
+      {
+        model: model.OrderItem,
+        as: "OrderItems",
+        where: { isCancelled: false },
+        required: false,
+        include: [
+          {
+            model: model.MenuItem,
+            as: "item",
+            attributes: ["itemID", "itemName", "typeOfFood", "preparationTime"],
+          },
+        ],
+      },
+    ],
+    order: [["orderID", "ASC"]],
+  });
+
+  const orderedItems = [];
+  let totalDishCount = 0;
+  let totalBill = 0;
+
+  for (const order of orders) {
+    for (const item of order.OrderItems || []) {
+      const quantity = Number(item.quantity || 0);
+      const lineTotal = Number(item.lineTotal || 0);
+
+      totalDishCount += quantity;
+      totalBill += lineTotal;
+
+      orderedItems.push({
+        chooseID: item.orderItemID,
+        orderItemID: item.orderItemID,
+        orderID: order.orderID,
+        itemID: item.itemID,
+        itemName: item.item?.itemName || null,
+        type_of_food: item.item?.typeOfFood || null,
+        quantity,
+        note: item.note,
+        status: item.status,
+        lineTotal,
+        preparation_time: item.item?.preparationTime ?? null,
+      });
+    }
+  }
+
+  return {
+    totalDishCount,
+    totalBill,
+    orderedItems,
+  };
 };
 
 export const showMenuItemsService = async () => {
-  // try {
-  //   // Fetch distinct types of food
-  //   const types = await model.MenuItem.findAll({
-  //     attributes: ['type_of_food'],
-  //     group: ['type_of_food'], // Get unique type_of_food values
-  //     order: [['type_of_food', 'ASC']], // Sort types alphabetically
-  //   });
-  //   // Extract type_of_food values
-  //   const typeNames = types.map(type => type.type_of_food);
-  //
-  //   // // Initialize an array to hold grouped menu items
-  //   const groupedMenuItems = [];
-  //
-  //   // For each type_of_food, fetch corresponding menu items
-  //   for (const type of typeNames) {
-  //     const items = await model.MenuItem.findAll({
-  //       where: { type_of_food: type },
-  //       attributes: [
-  //         'itemID',
-  //         'itemName',
-  //         'type_of_food',
-  //         'price',
-  //         'descriptions',
-  //         'preparation_time',
-  //         'status'
-  //       ],
-  //       order: [['itemName', 'ASC']], // Sort items alphabetically within each type
-  //     });
-  //
-  //     // Add the type and its items to the grouped result
-  //     groupedMenuItems.push({ type_of_food: type, items });
-  //   }
-  //     return { data: groupedMenuItems, status: 200 };
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error showing ", status: 500 };
-  // }
+  try {
+    const types = await model.MenuItem.findAll({
+      attributes: ["typeOfFood"],
+      where: { status: true },
+      group: ["typeOfFood"],
+      order: [["typeOfFood", "ASC"]],
+    });
+
+    const groupedMenuItems = [];
+
+    for (const typeRow of types) {
+      const type = typeRow.typeOfFood;
+      const items = await model.MenuItem.findAll({
+        where: { typeOfFood: type, status: true },
+        attributes: [
+          "itemID",
+          "itemName",
+          "price",
+          "descriptions",
+          "preparationTime",
+          "image",
+        ],
+        order: [["itemName", "ASC"]],
+      });
+
+      groupedMenuItems.push({
+        type_of_food: type,
+        items,
+      });
+    }
+
+    return { data: groupedMenuItems, status: 200 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching menu items", status: 500 };
+  }
 };
 
-export const registerCustomerService = async (      
+export const registerCustomerService = async (
   customerName,
   phone,
-  age,
-  tableID
+  guestCount,
+  tableID,
+  authUser
 ) => {
-  // try {
-  //   // Check if the table is vacant
-  //   const table = await model.TableEntity.findOne({
-  //     where: { tableID, Status: false }, // Status: false means vacant
-  //   });
-  //   if (!table) {
-  //     return { error: "Table is already occupied or does not exist", status: 400 };
-  //   }
-  //   // Create a new customer
-  //   const newCustomer = await model.ServiceSession.create(
-  //     {
-  //       tableID,
-  //       customerName: customerName,
-  //       phone: phone,
-  //       age: age,
-  //     },
-  //   );
-  //
-  //   // Update the table's status to occupied
-  //   table.status = true
-  //   await table.save();
-  //   return { data: newCustomer, status: 200 };
-  //
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error registering the customer ", status: 500 };
-  // }
+  const { error } = startSessionSchema.validate({
+    customerName,
+    phone,
+    guestCount,
+    tableID,
+  });
+
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    if (!authUser || authUser.roleID !== ROLE.STAFF) {
+      return { error: "Only staff can start a dining session", status: 403 };
+    }
+
+    const table = await model.TableEntity.findByPk(tableID);
+    if (!table) {
+      return { error: "Table not found", status: 404 };
+    }
+
+    if (table.tabletAccountID !== authUser.accountID) {
+      return { error: "Staff can only operate on assigned table", status: 403 };
+    }
+
+    if (table.status !== TABLE_STATUS.VACANT) {
+      return { error: "Table is occupied", status: 400 };
+    }
+
+    const activeSession = await model.ServiceSession.findOne({
+      where: {
+        tableID,
+        status: [SESSION_STATUS.OPEN, SESSION_STATUS.PAID],
+      },
+    });
+
+    if (activeSession) {
+      return { error: "This table already has an active session", status: 400 };
+    }
+
+    const session = await model.ServiceSession.create({
+      tableID,
+      customerName,
+      phone: phone || null,
+      guestCount,
+      status: SESSION_STATUS.OPEN,
+      checkInTime: new Date(),
+    });
+
+    table.status = TABLE_STATUS.OCCUPIED;
+    await table.save();
+
+    return {
+      data: {
+        ...mapSessionResponse(session),
+        tableStatus: table.status,
+      },
+      status: 201,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error starting dining session", status: 500 };
+  }
 };
 
-export const chooseMenuItemsService = async (
-  customerID,
-  items
-) => {
-  // try {
-  //   const chooseEntries = [];
-  //
-  //     for (const item of items) {
-  //       const { itemID, quantity, note } = item;
-  //
-  //       // Fetch the original price of the item from Menu_Item table
-  //       const menuItem = await model.MenuItem.findOne({ where: { itemID } });
-  //
-  //       if (!menuItem) {
-  //         return { error: `Item with ID ${itemID} does not exist`, status: 404 };
-  //       }
-  //        // Calculate total price based on quantity
-  //        const totalPrice = menuItem.price * quantity;
-  //
-  //        // Create a new entry in the Choose table
-  //        const newChoose = await model.OrderItem.create(
-  //          {
-  //            customerID,
-  //            itemID,
-  //            note: note || null,
-  //            price: totalPrice,
-  //            quantity,
-  //            status: 'order', // Default status is 'order'
-  //          }
-  //        );
-  //
-  //       //  // Add preparation_time to the response data
-  //       //   const newChooseWithPrepTime = {
-  //       //     ...newChoose.toJSON(), // Convert Sequelize instance to plain object
-  //       //     preparation_time: menuItem.preparation_time,
-  //       //   };
-  //
-  //        chooseEntries.push(newChoose);
-  //     }
-  //
-  //     return { data: chooseEntries, status: 200 };
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error choosing menu items ", status: 500 };
-  // }
+export const chooseMenuItemsService = async (sessionID, items) => {
+  const { error } = orderItemsSchema.validate(items);
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    if (session.status !== SESSION_STATUS.OPEN) {
+      return { error: "Cannot add draft items to closed session", status: 400 };
+    }
+
+    let draftOrder = await getDraftOrder(sessionID);
+    if (!draftOrder) {
+      const nextOrderNumber = await getNextOrderNumber(sessionID);
+      draftOrder = await model.Order.create({
+        sessionID,
+        orderNumber: nextOrderNumber,
+        status: ORDER_STATUS.NEW,
+      });
+    }
+
+    const createdItems = [];
+
+    for (const item of items) {
+      const menuItem = await model.MenuItem.findOne({
+        where: { itemID: item.itemID, status: true },
+      });
+
+      if (!menuItem) {
+        return { error: `Menu item ${item.itemID} not found or unavailable`, status: 404 };
+      }
+
+      const unitPrice = Number(menuItem.price || 0);
+      const lineTotal = unitPrice * item.quantity;
+
+      const orderItem = await model.OrderItem.create({
+        orderID: draftOrder.orderID,
+        itemID: item.itemID,
+        note: item.note || null,
+        unitPrice,
+        quantity: item.quantity,
+        lineTotal,
+        status: FOOD_STATUS.ORDERED,
+        isCancelled: false,
+      });
+
+      createdItems.push(orderItem);
+    }
+
+    return { data: createdItems, status: 201 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error adding draft order items", status: 500 };
+  }
 };
 
+export const editChosenItemsService = async (sessionID, items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { error: "items must be a non-empty array", status: 400 };
+  }
 
-export const editChosenItemsService = async (
-  customerID,
-  items
-) => {
-  // try {
-  //   const updatedItems = [];
-  //
-  //     for (const item of items) {
-  //       const { itemID, note, quantity, deleted } = item;
-  //       // Find the chosen item
-  //       const chosenItem = await model.OrderItem.findOne({
-  //         where: {
-  //           customerID,
-  //           itemID,
-  //           status: 'order', // Only allow edits for items with 'order' status
-  //         },
-  //       });
-  //
-  //       if (!chosenItem) {
-  //         return {
-  //           error: `Item with ID ${itemID} either does not belong to customer ${customerID} or is not in 'order' status`,
-  //           status: 404,
-  //         };
-  //       }
-  //        // Validate quantity
-  //        if (quantity <= 0) {
-  //         return { error: `Quantity for item ${itemID} must be greater than 0`, status: 400 };
-  //       }
-  //
-  //       // Calculate the updated price (based on quantity and original price)
-  //       const menuItem = await model.MenuItem.findOne({ where: { itemID } });
-  //       const updatedPrice = menuItem.price * quantity;
-  //
-  //       // Update the chosen item
-  //       chosenItem.note = note || chosenItem.note; // Update note if provided
-  //       chosenItem.quantity = quantity || chosenItem.quantity; // Update quantity
-  //       chosenItem.price = updatedPrice || chosenItem.price; // Update price
-  //       chosenItem.deleted = deleted !== undefined ? deleted : chosenItem.deleted; // Update deleted if provided
-  //       // Add preparation_time to the response data
-  //
-  //       await chosenItem.save();
-  //
-  //       updatedItems.push(chosenItem);
-  //
-  //       if (!menuItem) {
-  //         return { error: `Menu item with ID ${itemID} does not exist`, status: 404 };
-  //       }
-  //     }
-  //
-  //     return { data: updatedItems, status: 200 };
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error editing menu items ", status: 500 };
-  // }
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    if (session.status !== SESSION_STATUS.OPEN) {
+      return { error: "Cannot edit draft items of closed session", status: 400 };
+    }
+
+    const draftOrder = await getDraftOrder(sessionID);
+    if (!draftOrder) {
+      return { error: "No draft order to edit", status: 404 };
+    }
+
+    const updatedItems = [];
+
+    for (const item of items) {
+      if (!item.itemID) {
+        return { error: "itemID is required", status: 400 };
+      }
+
+      const orderItem = await model.OrderItem.findOne({
+        where: {
+          orderID: draftOrder.orderID,
+          itemID: item.itemID,
+          isCancelled: false,
+        },
+      });
+
+      if (!orderItem) {
+        return { error: `Draft item ${item.itemID} not found`, status: 404 };
+      }
+
+      if (orderItem.status !== FOOD_STATUS.ORDERED) {
+        return { error: `Item ${item.itemID} cannot be edited in status ${orderItem.status}`, status: 400 };
+      }
+
+      if (item.deleted === true) {
+        orderItem.isCancelled = true;
+        orderItem.status = FOOD_STATUS.CANCELLED;
+        await orderItem.save();
+        updatedItems.push(orderItem);
+        continue;
+      }
+
+      const newQuantity = item.quantity ?? orderItem.quantity;
+      if (!Number.isInteger(newQuantity) || newQuantity <= 0) {
+        return { error: `Invalid quantity for item ${item.itemID}`, status: 400 };
+      }
+
+      const menuItem = await model.MenuItem.findByPk(item.itemID);
+      if (!menuItem) {
+        return { error: `Menu item ${item.itemID} not found`, status: 404 };
+      }
+
+      orderItem.quantity = newQuantity;
+      orderItem.note = item.note ?? orderItem.note;
+      orderItem.unitPrice = Number(menuItem.price || 0);
+      orderItem.lineTotal = orderItem.unitPrice * newQuantity;
+      await orderItem.save();
+
+      updatedItems.push(orderItem);
+    }
+
+    return { data: updatedItems, status: 200 };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error editing draft order items", status: 500 };
+  }
 };
 
-export const checkoutBillService = async (
-  customerID,
-  payment_method, 
-  feedback
-) => {
-  // try {
-  //   // Update the table status to 0 (vacant)
-  //   const currentCustomer = await model.ServiceSession.findOne({
-  //     where: { customerID },
-  //   });
-  //
-  //   const currentTable = await model.TableEntity.findOne({
-  //     where: {
-  //       tableID: currentCustomer.tableID
-  //     }
-  //   })
-  //
-  //   if (!currentTable) {
-  //     return res.status(404).json({ error: "Table not found" });
-  //   }
-  //
-  //   // Check if the table's status is 0 (vacant)
-  //   if (currentTable.status == 0) {
-  //     return res.status(400).json({ error: "Table is vacant. Cannot proceed." });
-  //   }
-  //
-  //   // Find all Choose records for the customer with status NOT 'order' and deleted == 0
-  //   const chosenItems = await model.OrderItem.findAll({
-  //     where: {
-  //       customerID,
-  //       status: { [Op.ne]: 'order' }, // Not 'order'
-  //       deleted: false,
-  //     }
-  //   });
-  //   if (!chosenItems.length) {
-  //     return { error: "No items found to checkout for this customer", status: 400 };
-  //   }
-  //   // Calculate total price
-  //   const totalPrice = chosenItems.reduce((sum, item) => sum + item.price, 0);
-  //   // Create a transaction record
-  //   const transactionRecord = await model.Transaction.create(
-  //     {
-  //       customerID,
-  //       payment_method,
-  //       feedback,
-  //       totalPrice,
-  //     }
-  //   );
-  //   // Create orders for each chosen item
-  //   const orders = [];
-  //   for (const chosenItem of chosenItems) {
-  //     const order = await model.Order.create(
-  //       {
-  //         transactionID: transactionRecord.transactionID,
-  //         chooseID: chosenItem.chooseID,
-  //       },
-  //     );
-  //     orders.push(order);
-  //   }
-  //
-  //
-  //   currentTable.status = 0; // Set table status to vacant
-  //   await currentTable.save();
-  //
-  //     return { data: {
-  //       transaction: transactionRecord,
-  //       orders
-  //     }, status: 200 };
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error checking out bill", status: 500 };
-  // }
+export const submitOrderService = async (sessionID) => {
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    if (session.status !== SESSION_STATUS.OPEN) {
+      return { error: "Cannot submit order for closed session", status: 400 };
+    }
+
+    const draftOrder = await getDraftOrder(sessionID);
+    if (!draftOrder) {
+      return { error: "No draft order found", status: 404 };
+    }
+
+    const draftItems = await model.OrderItem.findAll({
+      where: {
+        orderID: draftOrder.orderID,
+        isCancelled: false,
+        status: FOOD_STATUS.ORDERED,
+      },
+    });
+
+    if (!draftItems.length) {
+      return { error: "No draft items to submit", status: 400 };
+    }
+
+    for (const item of draftItems) {
+      item.status = FOOD_STATUS.PREPARING;
+      await item.save();
+    }
+
+    draftOrder.status = ORDER_STATUS.SENT_TO_KITCHEN;
+    await draftOrder.save();
+
+    const summary = await summarizeSubmittedItems(sessionID);
+
+    return {
+      data: {
+        customerID: sessionID,
+        sessionID,
+        submittedItems: draftItems.length,
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error submitting order", status: 500 };
+  }
 };
 
-export const getChosenItemsService = async (customerID) => {
-  // try {
-  //   // Fetch distinct types of food
-  //   const types = await model.OrderItem.findAll({
-  //     where:{customerID},
-  //     attributes: ['status'],
-  //     group: ['status'], // Get unique type_of_food values
-  //     order: [['status', 'ASC']], // Sort types alphabetically
-  //   });
-  //   // Extract type_of_food values
-  //   const typeNames = types.map(type => type.status);
-  //
-  //   // // Initialize an array to hold grouped menu items
-  //   const groupedMenuItems = [];
-  //
-  //   // For each type_of_food, fetch corresponding menu items
-  //   for (const type of typeNames) {
-  //     const items = await model.OrderItem.findAll({
-  //       where: {
-  //         status: type,
-  //         customerID: customerID
-  //        },
-  //       attributes: [
-  //         'itemID',
-  //         'note',
-  //         'price',
-  //         'quantity',
-  //         'status'
-  //       ],
-  //       include: [
-  //         {
-  //           model: model.MenuItem,
-  //           as: 'item', // Assuming a proper association exists
-  //           attributes: ['itemName','type_of_food', 'descriptions','preparation_time'], // Include menu item details
-  //         },
-  //       ],
-  //     });
-  //
-  //
-  //     // Add the type and its items to the grouped result
-  //     groupedMenuItems.push({ status: type, items });
-  //   }
-  //     return { data: groupedMenuItems, status: 200 };
-  //
-  // } catch (err) {
-  //     console.error(err);
-  //     return { error: "Error showing ", status: 500 };
-  // }
+export const getChosenItemsService = async (sessionID) => {
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    const summary = await summarizeSubmittedItems(sessionID);
+
+    return {
+      data: {
+        ...mapSessionResponse(session),
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+        orderedItems: summary.orderedItems,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching ordered items", status: 500 };
+  }
+};
+
+export const getBillService = async (sessionID) => {
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    const summary = await summarizeSubmittedItems(sessionID);
+
+    return {
+      data: {
+        customerID: sessionID,
+        sessionID,
+        tableID: session.tableID,
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching bill", status: 500 };
+  }
+};
+
+export const checkoutBillService = async (sessionID, payment_method, feedback) => {
+  const { error } = checkoutSchema.validate({ payment_method, feedback });
+  if (error) {
+    return { error: error.details[0].message, status: 400 };
+  }
+
+  try {
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    if (session.status !== SESSION_STATUS.OPEN) {
+      return { error: "Session is not open for payment request", status: 400 };
+    }
+
+    const summary = await summarizeSubmittedItems(sessionID);
+    if (!summary.orderedItems.length) {
+      return { error: "No submitted items found for checkout", status: 400 };
+    }
+
+    const existingPending = await model.Transaction.findOne({
+      where: {
+        sessionID,
+        paymentStatus: PAYMENT_STATUS.PENDING,
+      },
+      order: [["transactionID", "DESC"]],
+    });
+
+    if (existingPending) {
+      return {
+        data: existingPending,
+        status: 200,
+      };
+    }
+
+    const transaction = await model.Transaction.create({
+      sessionID,
+      paymentMethod: payment_method,
+      paymentStatus: PAYMENT_STATUS.PENDING,
+      totalPrice: summary.totalBill,
+      feedback: feedback || null,
+    });
+
+    return {
+      data: {
+        transactionID: transaction.transactionID,
+        sessionID,
+        paymentStatus: transaction.paymentStatus,
+        totalPrice: transaction.totalPrice,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error requesting payment", status: 500 };
+  }
 };
