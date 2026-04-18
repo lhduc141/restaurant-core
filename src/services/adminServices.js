@@ -38,8 +38,8 @@ const addMenuSchema = Joi.object({
   image: Joi.string().allow(null, "").optional(),
 });
 
-const getAdminByID = async (adminID) => {
-  const admin = await model.Admin.findByPk(adminID);
+const getAdminByAccountID = async (accountID) => {
+  const admin = await model.Admin.findOne({ where: { accountID } });
   if (!admin) {
     return { error: "Admin not found", status: 404 };
   }
@@ -102,9 +102,13 @@ const summarizeSession = async (sessionID) => {
   };
 };
 
-export const editStatusOfMenuItemsService = async (adminID, items) => {
+export const editStatusOfMenuItemsService = async (authUser, items) => {
   try {
-    const { error: adminError, status } = await getAdminByID(adminID);
+    if (!authUser?.accountID) {
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    const { error: adminError, status } = await getAdminByAccountID(authUser.accountID);
     if (adminError) {
       return { error: adminError, status };
     }
@@ -266,9 +270,13 @@ export const getTableDetailService = async (tableID) => {
   }
 };
 
-export const updateTableStatusService = async (adminID, tableID, status) => {
+export const updateTableStatusService = async (authUser, tableID, status) => {
   try {
-    const { error: adminError, status: adminStatus } = await getAdminByID(adminID);
+    if (!authUser?.accountID) {
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    const { error: adminError, status: adminStatus } = await getAdminByAccountID(authUser.accountID);
     if (adminError) {
       return { error: adminError, status: adminStatus };
     }
@@ -351,9 +359,13 @@ export const viewDetailTransactionService = async (transactionID) => {
   }
 };
 
-export const confirmPaymentService = async (adminID, transactionID) => {
+export const confirmPaymentService = async (authUser, transactionID) => {
   try {
-    const { error: adminError, status: adminStatus } = await getAdminByID(adminID);
+    if (!authUser?.accountID) {
+      return { error: "Unauthorized", status: 401 };
+    }
+
+    const { error: adminError, status: adminStatus } = await getAdminByAccountID(authUser.accountID);
     if (adminError) {
       return { error: adminError, status: adminStatus };
     }

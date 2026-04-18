@@ -3,9 +3,8 @@ import * as service from "../services/adminServices.js";
 
 export default class AdminController {
   static async editStatusOfMenuItems(req, res) {
-    const { adminID } = req.params;
     const { items } = req.body;
-    const { error, data, status } = await service.editStatusOfMenuItemsService(adminID, items);
+    const { error, data, status } = await service.editStatusOfMenuItemsService(req.user, items);
 
     if (error) {
       return responseData(res, error, null, status);
@@ -14,10 +13,10 @@ export default class AdminController {
   }
 
   static async updateTableStatus(req, res) {
-    const { adminID, tableID } = req.params;
+    const { tableID } = req.params;
     const { status: nextStatus } = req.body;
     const { error, data, status } = await service.updateTableStatusService(
-      adminID,
+      req.user,
       Number(tableID),
       nextStatus
     );
@@ -95,9 +94,9 @@ export default class AdminController {
   }
 
   static async confirmPayment(req, res) {
-    const { adminID, transactionID } = req.params;
+    const { transactionID } = req.params;
     const { error, data, status } = await service.confirmPaymentService(
-      Number(adminID),
+      req.user,
       Number(transactionID)
     );
 
