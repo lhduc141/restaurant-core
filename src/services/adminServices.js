@@ -102,6 +102,16 @@ const summarizeSession = async (sessionID) => {
   };
 };
 
+const getLatestTransactionIDBySession = async (sessionID) => {
+  const latestTransaction = await model.Transaction.findOne({
+    where: { sessionID },
+    order: [["transactionID", "DESC"]],
+    attributes: ["transactionID"],
+  });
+
+  return latestTransaction?.transactionID || null;
+};
+
 export const editStatusOfMenuItemsService = async (authUser, items) => {
   try {
     if (!authUser?.accountID) {
@@ -189,6 +199,10 @@ export const getItemsOfTablesService = async (quantity) => {
         order: [["sessionID", "DESC"]],
       });
 
+      const transactionID = activeSession
+        ? await getLatestTransactionIDBySession(activeSession.sessionID)
+        : null;
+
       const summary = activeSession
         ? await summarizeSession(activeSession.sessionID)
         : { totalDishCount: 0, totalBill: 0, orderedItems: [] };
@@ -209,6 +223,7 @@ export const getItemsOfTablesService = async (quantity) => {
               status: activeSession.status,
             }
           : null,
+        transactionID,
         totalDishCount: summary.totalDishCount,
         totalBill: summary.totalBill,
         orderedItems: summary.orderedItems,
@@ -237,6 +252,10 @@ export const getTableDetailService = async (tableID) => {
       order: [["sessionID", "DESC"]],
     });
 
+    const transactionID = activeSession
+      ? await getLatestTransactionIDBySession(activeSession.sessionID)
+      : null;
+
     const summary = activeSession
       ? await summarizeSession(activeSession.sessionID)
       : { totalDishCount: 0, totalBill: 0, orderedItems: [] };
@@ -258,6 +277,7 @@ export const getTableDetailService = async (tableID) => {
               status: activeSession.status,
             }
           : null,
+        transactionID,
         totalDishCount: summary.totalDishCount,
         totalBill: summary.totalBill,
         orderedItems: summary.orderedItems,
