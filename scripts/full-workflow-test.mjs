@@ -172,6 +172,37 @@ const run = async () => {
   assert(checkout.status === 200, `checkout failed: ${checkout.status}`);
   const transactionID = checkout.body?.data?.transactionID;
 
+  const paymentStatusAfterCheckout = await req(
+    "GET",
+    `/table/v1/orders/${sessionID}/payment-status`,
+    undefined,
+    staffToken
+  );
+  assert(
+    paymentStatusAfterCheckout.status === 200,
+    `payment status after checkout failed: ${paymentStatusAfterCheckout.status}`
+  );
+  assert(
+    paymentStatusAfterCheckout.body?.data?.transactionID === transactionID,
+    "payment status should return latest transactionID"
+  );
+  assert(
+    paymentStatusAfterCheckout.body?.data?.paymentStatus === "PENDING",
+    "payment status should be PENDING right after checkout"
+  );
+
+  const pendingTransactions = await req(
+    "GET",
+    `/admin/v1/transactions?paymentStatus=PENDING`,
+    undefined,
+    adminToken
+  );
+  assert(pendingTransactions.status === 200, `list pending transactions failed: ${pendingTransactions.status}`);
+  assert(
+    (pendingTransactions.body?.data || []).some((entry) => entry.transactionID === transactionID),
+    "pending transactions list should include newly created transaction"
+  );
+
   const confirm = await req(
     "PATCH",
     `/admin/v1/${adminID}/transactions/${transactionID}/confirm-payment`,
@@ -187,6 +218,36 @@ const run = async () => {
     adminToken
   );
   assert(doubleConfirm.status === 400, `double confirm should be blocked: ${doubleConfirm.status}`);
+
+  const paymentStatusAfterConfirm = await req(
+    "GET",
+    `/table/v1/orders/${sessionID}/payment-status`,
+    undefined,
+    staffToken
+  );
+  assert(
+    paymentStatusAfterConfirm.status === 200,
+    `payment status after confirm failed: ${paymentStatusAfterConfirm.status}`
+  );
+  assert(
+    paymentStatusAfterConfirm.body?.data?.paymentStatus === "PAID",
+    "payment status should be PAID after confirmation"
+  );
+
+  const pendingTransactionsAfterConfirm = await req(
+    "GET",
+    `/admin/v1/transactions?paymentStatus=PENDING`,
+    undefined,
+    adminToken
+  );
+  assert(
+    pendingTransactionsAfterConfirm.status === 200,
+    `list pending transactions after confirm failed: ${pendingTransactionsAfterConfirm.status}`
+  );
+  assert(
+    !(pendingTransactionsAfterConfirm.body?.data || []).some((entry) => entry.transactionID === transactionID),
+    "confirmed transaction should not remain in pending list"
+  );
 
   const orderAfterClosed = await req(
     "POST",

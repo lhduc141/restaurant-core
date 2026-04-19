@@ -10,6 +10,7 @@ router.use(requireAuth);
 router.get('/v1/current', requireRole(ROLE.STAFF), TableController.getCurrentTable);
 router.get('/v1/menu/:sessionID/choose', TableController.getChosenItems);
 router.get('/v1/orders/:sessionID/bill', TableController.getBill);
+router.get('/v1/orders/:sessionID/payment-status', requireRole(ROLE.STAFF), TableController.getPaymentStatus);
 router.get('/v1/menu-item', TableController.showMenuItems);
 
 router.post('/v1/:tableID/customers', requireRole(ROLE.STAFF), TableController.registerCustomer);

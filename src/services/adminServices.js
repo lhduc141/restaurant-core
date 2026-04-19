@@ -379,6 +379,49 @@ export const viewDetailTransactionService = async (transactionID) => {
   }
 };
 
+export const listTransactionsService = async (paymentStatus) => {
+  try {
+    const normalizedStatus = (paymentStatus || PAYMENT_STATUS.PENDING).toUpperCase();
+    const allowedStatuses = Object.values(PAYMENT_STATUS);
+
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return { error: "Invalid paymentStatus", status: 400 };
+    }
+
+    const transactions = await model.Transaction.findAll({
+      where: { paymentStatus: normalizedStatus },
+      include: [
+        {
+          model: model.ServiceSession,
+          as: "session",
+          attributes: ["tableID", "customerName", "phone", "guestCount"],
+        },
+      ],
+      order: [["transactionID", "DESC"]],
+    });
+
+    return {
+      data: transactions.map((transaction) => ({
+        transactionID: transaction.transactionID,
+        sessionID: transaction.sessionID,
+        tableID: transaction.session?.tableID || null,
+        customerName: transaction.session?.customerName || null,
+        phone: transaction.session?.phone || null,
+        guestCount: transaction.session?.guestCount || null,
+        paymentMethod: transaction.paymentMethod,
+        paymentStatus: transaction.paymentStatus,
+        totalPrice: Number(transaction.totalPrice || 0),
+        paidAt: transaction.paidAt,
+        createdAt: transaction.createdAt,
+      })),
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching transactions", status: 500 };
+  }
+};
+
 export const confirmPaymentService = async (authUser, transactionID) => {
   try {
     if (!authUser?.accountID) {

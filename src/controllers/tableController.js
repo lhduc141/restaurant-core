@@ -92,6 +92,17 @@ export default class TableController {
     return responseData(res, "successful", data, status);
   }
 
+  static async getPaymentStatus(req, res) {
+    const { sessionID } = req.params;
+    const { error, data, status } = await service.getPaymentStatusService(Number(sessionID), req.user);
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+
+    return responseData(res, "successful", data, status);
+  }
+
   static async checkoutBill(req, res) {
     const { sessionID } = req.params;
     const { payment_method, feedback } = req.body;

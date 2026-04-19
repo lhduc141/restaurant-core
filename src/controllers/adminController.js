@@ -93,6 +93,16 @@ export default class AdminController {
     return responseData(res, "success", data, status);
   }
 
+  static async listTransactions(req, res) {
+    const { paymentStatus } = req.query;
+    const { error, data, status } = await service.listTransactionsService(paymentStatus);
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+    return responseData(res, "success", data, status);
+  }
+
   static async confirmPayment(req, res) {
     const { transactionID } = req.params;
     const { error, data, status } = await service.confirmPaymentService(

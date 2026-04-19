@@ -585,6 +585,48 @@ export const getBillService = async (sessionID) => {
   }
 };
 
+export const getPaymentStatusService = async (sessionID, authUser) => {
+  try {
+    if (!authUser || authUser.roleID !== ROLE.STAFF) {
+      return { error: "Only staff can access payment status", status: 403 };
+    }
+
+    const { session, error: sessionError, status } = await getSessionByID(sessionID);
+    if (sessionError) {
+      return { error: sessionError, status };
+    }
+
+    const table = await model.TableEntity.findByPk(session.tableID);
+    if (!table) {
+      return { error: "Table not found", status: 404 };
+    }
+
+    if (table.tabletAccountID !== authUser.accountID) {
+      return { error: "Staff can only view payment status of assigned table", status: 403 };
+    }
+
+    const latestTransaction = await model.Transaction.findOne({
+      where: { sessionID },
+      order: [["transactionID", "DESC"]],
+    });
+
+    return {
+      data: {
+        sessionID,
+        transactionID: latestTransaction?.transactionID || null,
+        paymentStatus: latestTransaction?.paymentStatus || null,
+        paymentMethod: latestTransaction?.paymentMethod || null,
+        totalPrice: latestTransaction ? Number(latestTransaction.totalPrice || 0) : null,
+        paidAt: latestTransaction?.paidAt || null,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching payment status", status: 500 };
+  }
+};
+
 export const checkoutBillService = async (sessionID, payment_method, feedback) => {
   const { error } = checkoutSchema.validate({ payment_method, feedback });
   if (error) {

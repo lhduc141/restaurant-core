@@ -14,6 +14,7 @@ router.patch('/v1/:adminID/tables/:tableID/status', AdminController.updateTableS
 router.get('/v1/tables', AdminController.getItemsOfTables);
 router.get('/v1/tables/:tableID', AdminController.getTableDetail);
 router.get('/v1/revenue', AdminController.getDailyRevenue);
+router.get('/v1/transactions', AdminController.listTransactions);
 router.get('/v1/transaction', AdminController.viewDetailTransaction);
 router.patch('/v1/transactions/:transactionID/confirm-payment', AdminController.confirmPayment);
 router.patch('/v1/:adminID/transactions/:transactionID/confirm-payment', AdminController.confirmPayment);
