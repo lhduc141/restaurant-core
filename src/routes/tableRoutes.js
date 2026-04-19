@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+router.get('/v1/current', requireRole(ROLE.STAFF), TableController.getCurrentTable);
 router.get('/v1/menu/:sessionID/choose', TableController.getChosenItems);
 router.get('/v1/orders/:sessionID/bill', TableController.getBill);
 router.get('/v1/menu-item', TableController.showMenuItems);

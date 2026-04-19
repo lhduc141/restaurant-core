@@ -2,6 +2,15 @@ import { responseData } from "../config/response.js";
 import * as service from "../services/tableServices.js";
 
 export default class TableController {
+  static async getCurrentTable(req, res) {
+    const { error, data, status } = await service.getCurrentTableService(req.user);
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+    return responseData(res, "successful", data, status);
+  }
+
   static async showMenuItems(req, res) {
     const { error, data, status } = await service.showMenuItemsService();
 

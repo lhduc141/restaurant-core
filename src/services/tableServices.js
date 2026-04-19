@@ -134,6 +134,70 @@ const summarizeSubmittedItems = async (sessionID) => {
   };
 };
 
+const getLatestTransactionIDBySession = async (sessionID) => {
+  const latestTransaction = await model.Transaction.findOne({
+    where: { sessionID },
+    order: [["transactionID", "DESC"]],
+    attributes: ["transactionID"],
+  });
+
+  return latestTransaction?.transactionID || null;
+};
+
+export const getCurrentTableService = async (authUser) => {
+  try {
+    if (!authUser || authUser.roleID !== ROLE.STAFF) {
+      return { error: "Only staff can access current table detail", status: 403 };
+    }
+
+    const table = authUser.tableID
+      ? await model.TableEntity.findByPk(authUser.tableID)
+      : await model.TableEntity.findOne({ where: { tabletAccountID: authUser.accountID } });
+
+    if (!table) {
+      return { error: "Assigned table not found", status: 404 };
+    }
+
+    if (table.tabletAccountID !== authUser.accountID) {
+      return { error: "Staff can only view assigned table", status: 403 };
+    }
+
+    const activeSession = await model.ServiceSession.findOne({
+      where: {
+        tableID: table.tableID,
+        status: [SESSION_STATUS.OPEN, SESSION_STATUS.PAID],
+      },
+      order: [["sessionID", "DESC"]],
+    });
+
+    const transactionID = activeSession
+      ? await getLatestTransactionIDBySession(activeSession.sessionID)
+      : null;
+
+    const summary = activeSession
+      ? await summarizeSubmittedItems(activeSession.sessionID)
+      : { totalDishCount: 0, totalBill: 0, orderedItems: [] };
+
+    return {
+      data: {
+        tableID: table.tableID,
+        tableName: table.tableName,
+        capacity: table.capacity,
+        status: table.status,
+        activeSession: activeSession ? mapSessionResponse(activeSession) : null,
+        transactionID,
+        totalDishCount: summary.totalDishCount,
+        totalBill: summary.totalBill,
+        orderedItems: summary.orderedItems,
+      },
+      status: 200,
+    };
+  } catch (serviceError) {
+    console.error(serviceError);
+    return { error: "Error fetching current table detail", status: 500 };
+  }
+};
+
 export const showMenuItemsService = async () => {
   try {
     const types = await model.MenuItem.findAll({
