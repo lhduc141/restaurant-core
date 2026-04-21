@@ -1,18 +1,27 @@
 import cors from "cors";
 import express from "express";
+import http from "http";
 import sequelize from "./config/database.js";
 import initModels from "./models/init-models.js";
 import { ROLE } from "./constant/enum.js";
 import router from "./routes/rootRoutes.js";
+import requestId from "./middlewares/requestId.js";
+import { initSocket } from "./realtime/socket.js";
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
-app.use(express.json());
-app.use(cors());
+app.use(requestId);
+app.use(express.json({ limit: "10mb" }));
+app.use(
+  cors({
+    origin: process.env.PORTAL_ORIGIN?.split(",") || ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
-// Use the routes defined in the routes folder
 app.use("/", router);
 
 const bootstrapDatabase = async () => {
@@ -20,7 +29,6 @@ const bootstrapDatabase = async () => {
   console.log("Database connected success");
 
   const syncMode = (process.env.DB_SYNC_MODE || "none").trim().toLowerCase();
-
   if (syncMode === "alter" || syncMode === "force") {
     throw new Error(
       "Runtime schema sync is disabled. Remove DB_SYNC_MODE=alter/force and apply migrations before startup."
@@ -41,7 +49,9 @@ const bootstrapDatabase = async () => {
 const startServer = async () => {
   try {
     await bootstrapDatabase();
-    app.listen(PORT, () => {
+    initSocket(server);
+
+    server.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
     });
   } catch (err) {
