@@ -2,72 +2,138 @@ import { responseData } from "../config/response.js";
 import * as service from "../services/adminServices.js";
 
 export default class AdminController {
-
   static async editStatusOfMenuItems(req, res) {
-    const {adminID} = req.params;
     const { items } = req.body;
-    const { error, data, status } = await service.editStatusOfMenuItemsService(adminID, items);
+    const { error, data, status } = await service.editStatusOfMenuItemsService(req.user, items);
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "success", data, status);
   }
+
+  static async updateTableStatus(req, res) {
+    const { tableID } = req.params;
+    const { status: nextStatus } = req.body;
+    const { error, data, status } = await service.updateTableStatusService(
+      req.user,
+      Number(tableID),
+      nextStatus
+    );
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+
+    return responseData(res, "success", data, status);
+  }
+
   static async editMenu(req, res) {
     const { itemID, itemName, type_of_food, price, descriptions, preparation_time } = req.body;
-    const { error, data, status } = await service.editMenuService(itemID, itemName, type_of_food, price, descriptions, preparation_time);
+    const { error, data, status } = await service.editMenuService(
+      itemID,
+      itemName,
+      type_of_food,
+      price,
+      descriptions,
+      preparation_time
+    );
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "success", data, status);
   }
+
   static async addNewFood(req, res) {
-    const { itemName, type_of_food, price, descriptions, preparation_time, image} = req.body;
-    const { error, data, status } = await service.addNewFoodService(itemName, type_of_food, price, descriptions, preparation_time, image);
+    const { itemName, type_of_food, price, descriptions, preparation_time, image } = req.body;
+    const { error, data, status } = await service.addNewFoodService(
+      itemName,
+      type_of_food,
+      price,
+      descriptions,
+      preparation_time,
+      image
+    );
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "success", data, status);
   }
 
   static async getItemsOfTables(req, res) {
-    const { error, data, status } = await service.getItemsOfTablesService();
+    const quantity = req.query.quantity ? Number(req.query.quantity) : undefined;
+    const { error, data, status } = await service.getItemsOfTablesService(quantity);
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "success", data, status);
   }
 
+  static async getTableDetail(req, res) {
+    const { tableID } = req.params;
+    const { error, data, status } = await service.getTableDetailService(Number(tableID));
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+
+    return responseData(res, "success", data, status);
+  }
+
   static async viewDetailTransaction(req, res) {
-    const { transactionID } = req.body;
+    const transactionID = Number(req.query.transactionID);
     const { error, data, status } = await service.viewDetailTransactionService(transactionID);
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
-    return responseData(res, "", data, status);
+    return responseData(res, "success", data, status);
+  }
+
+  static async listTransactions(req, res) {
+    const { paymentStatus } = req.query;
+    const { error, data, status } = await service.listTransactionsService(paymentStatus);
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+    return responseData(res, "success", data, status);
+  }
+
+  static async confirmPayment(req, res) {
+    const { transactionID } = req.params;
+    const { error, data, status } = await service.confirmPaymentService(
+      req.user,
+      Number(transactionID)
+    );
+
+    if (error) {
+      return responseData(res, error, null, status);
+    }
+
+    return responseData(res, "success", data, status);
   }
 
   static async getDailyRevenue(req, res) {
-    const { date } = req.body;
+    const { date } = req.query;
     const { error, data, status } = await service.getDailyRevenueService(date);
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "successful", data, status);
   }
+
   static async listTables(req, res) {
-    const { quantity  } = req.body;
+    const quantity = req.query.quantity ? Number(req.query.quantity) : undefined;
     const { error, data, status } = await service.listTablesService(quantity);
 
     if (error) {
-      return responseData(res, error, "", status);
+      return responseData(res, error, null, status);
     }
     return responseData(res, "successful", data, status);
   }
-  
 }

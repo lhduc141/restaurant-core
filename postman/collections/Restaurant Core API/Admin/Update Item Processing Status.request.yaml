@@ -1,0 +1,19 @@
+$kind: http-request
+name: Update Item Processing Status
+url: "{{base_url}}/admin/v1/{{admin_id}}/tables/status"
+method: PUT
+headers:
+  Authorization: Bearer {{admin_token}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "items": [
+        {
+          "chooseID": {{choose_id}},
+          "status": "IN_PROGRESS"
+        }
+      ]
+    }
+order: 1400

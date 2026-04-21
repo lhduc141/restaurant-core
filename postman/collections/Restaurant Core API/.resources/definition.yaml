@@ -2,3 +2,13 @@ $kind: collection
 description: Collection for testing Restaurant Core backend
 variables:
   base_url: http://localhost:3001
+  staff_token: ""
+  admin_token: ""
+  table_id: "1"
+  customer_id: "1"
+  item_id: "1"
+  choose_id: "1"
+  transaction_id: "1"
+  admin_id: "1"
+  table_capacity: "4"
+  report_date: "2026-04-17"

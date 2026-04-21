@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Vacant Tables
+url: "{{base_url}}/admin/v1/vacant?quantity={{table_capacity}}"
+method: GET
+headers:
+  Authorization: Bearer {{admin_token}}
+order: 1300

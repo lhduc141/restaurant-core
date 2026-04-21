@@ -1,13 +1,22 @@
 import express from 'express';
 import TableController from '../controllers/tableController.js';
+import { requireAuth, requireRole } from '../middlewares/auth.js';
+import { ROLE } from '../constant/enum.js';
 
 const router = express.Router();
 
-router.post('/v1/:tableID/customers', TableController.registerCustomer);
-router.get('/v1/menu/:customerID/choose', TableController.getChosenItems);
-router.post('/v1/menu/:customerID/choose', TableController.chooseMenuItems);
-router.put('/v1/menu/:customerID/choose', TableController.editChosenItems);
-router.post('/v1/orders/:customerID/checkout', TableController.checkoutBill);
+router.use(requireAuth);
+
+router.get('/v1/current', requireRole(ROLE.STAFF), TableController.getCurrentTable);
+router.get('/v1/menu/:sessionID/choose', TableController.getChosenItems);
+router.get('/v1/orders/:sessionID/bill', TableController.getBill);
+router.get('/v1/orders/:sessionID/payment-status', requireRole(ROLE.STAFF), TableController.getPaymentStatus);
 router.get('/v1/menu-item', TableController.showMenuItems);
+
+router.post('/v1/:tableID/customers', requireRole(ROLE.STAFF), TableController.registerCustomer);
+router.post('/v1/menu/:sessionID/choose', requireRole(ROLE.STAFF), TableController.chooseMenuItems);
+router.put('/v1/menu/:sessionID/choose', requireRole(ROLE.STAFF), TableController.editChosenItems);
+router.post('/v1/menu/:sessionID/submit', requireRole(ROLE.STAFF), TableController.submitOrder);
+router.post('/v1/orders/:sessionID/checkout', requireRole(ROLE.STAFF), TableController.checkoutBill);
 
 export default router;

@@ -1,7 +1,9 @@
 $kind: http-request
-url: "{{base_url}}/table/v1/1/customers"
+name: Register Customer
+url: "{{base_url}}/table/v1/{{table_id}}/customers"
 method: POST
 headers:
+  Authorization: Bearer {{staff_token}}
   Content-Type: application/json
 body:
   type: text
@@ -9,6 +11,6 @@ body:
     {
       "customerName": "John",
       "phone": "0909123456",
-      "age": 25
+      "guestCount": 2
     }
 order: 1000

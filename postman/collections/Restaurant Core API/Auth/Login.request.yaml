@@ -1,4 +1,5 @@
 $kind: http-request
+name: Login
 url: "{{base_url}}/auth/v1/login"
 method: POST
 headers:
@@ -7,7 +8,7 @@ body:
   type: text
   content: |-
     {
-      "email": "table1@example.com",
-      "password": "table1password"
+      "email": "staff_frontend@example.com",
+      "password": "123456"
     }
 order: 2000

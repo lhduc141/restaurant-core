@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Revenue
+url: "{{base_url}}/admin/v1/revenue?date={{report_date}}"
+method: GET
+headers:
+  Authorization: Bearer {{admin_token}}
+order: 5000

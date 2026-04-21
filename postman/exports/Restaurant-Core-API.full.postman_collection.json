@@ -1,0 +1,546 @@
+{
+  "info": {
+    "name": "Restaurant Core API (Full)",
+    "description": "Full API collection for frontend integration and workflow testing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "staff_token",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "table_id",
+      "value": "1"
+    },
+    {
+      "key": "session_id",
+      "value": "1"
+    },
+    {
+      "key": "item_id",
+      "value": "1"
+    },
+    {
+      "key": "choose_id",
+      "value": "1"
+    },
+    {
+      "key": "transaction_id",
+      "value": "1"
+    },
+    {
+      "key": "admin_id",
+      "value": "1"
+    },
+    {
+      "key": "table_capacity",
+      "value": "4"
+    },
+    {
+      "key": "report_date",
+      "value": "2026-04-17"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": 1,\n  \"email\": \"staff_frontend@example.com\",\n  \"password\": \"123456\",\n  \"name\": \"Table Frontend\",\n  \"quantity\": 4\n}"
+            },
+            "url": "{{base_url}}/auth/v1/signup"
+          }
+        },
+        {
+          "name": "Signup Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const adminId = json?.data?.roleDetails?.adminID;",
+                  "if (adminId) { pm.collectionVariables.set('admin_id', String(adminId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": 2,\n  \"email\": \"admin_frontend@example.com\",\n  \"password\": \"123456\",\n  \"name\": \"Admin Frontend\"\n}"
+            },
+            "url": "{{base_url}}/auth/v1/signup"
+          }
+        },
+        {
+          "name": "Login Staff (Set staff_token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken;",
+                  "if (token) { pm.collectionVariables.set('staff_token', token); }",
+                  "const tableId = json?.data?.user?.tableID;",
+                  "if (tableId) { pm.collectionVariables.set('table_id', String(tableId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff_frontend@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": "{{base_url}}/auth/v1/login"
+          }
+        },
+        {
+          "name": "Login Admin (Set admin_token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken;",
+                  "if (token) { pm.collectionVariables.set('admin_token', token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin_frontend@example.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": "{{base_url}}/auth/v1/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Table",
+      "item": [
+        {
+          "name": "Get Menu Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/table/v1/menu-item"
+          }
+        },
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const sessionId = json?.data?.sessionID || json?.data?.customerID;",
+                  "if (sessionId) { pm.collectionVariables.set('session_id', String(sessionId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"John\",\n  \"phone\": \"0909123456\",\n  \"guestCount\": 2\n}"
+            },
+            "url": "{{base_url}}/table/v1/{{table_id}}/customers"
+          }
+        },
+        {
+          "name": "Choose Menu Items",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const first = json?.data?.[0];",
+                  "const chooseId = first?.orderItemID || first?.chooseID;",
+                  "if (chooseId) { pm.collectionVariables.set('choose_id', String(chooseId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"itemID\": {{item_id}},\n      \"quantity\": 2,\n      \"note\": \"Less spicy\"\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/table/v1/menu/{{session_id}}/choose"
+          }
+        },
+        {
+          "name": "Edit Chosen Items",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"itemID\": {{item_id}},\n      \"quantity\": 1,\n      \"note\": \"No onion\",\n      \"deleted\": false\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/table/v1/menu/{{session_id}}/choose"
+          }
+        },
+        {
+          "name": "Submit Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{base_url}}/table/v1/menu/{{session_id}}/submit"
+          }
+        },
+        {
+          "name": "Get Chosen Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/table/v1/menu/{{session_id}}/choose"
+          }
+        },
+        {
+          "name": "Get Bill",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              }
+            ],
+            "url": "{{base_url}}/table/v1/orders/{{session_id}}/bill"
+          }
+        },
+        {
+          "name": "Checkout Bill",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const transactionId = json?.data?.transactionID;",
+                  "if (transactionId) { pm.collectionVariables.set('transaction_id', String(transactionId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_method\": \"CASH\",\n  \"feedback\": \"Good service\"\n}"
+            },
+            "url": "{{base_url}}/table/v1/orders/{{session_id}}/checkout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Tables",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/v1/tables"
+          }
+        },
+        {
+          "name": "Get Table Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/v1/tables/{{table_id}}"
+          }
+        },
+        {
+          "name": "List Vacant Tables",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/v1/vacant?quantity={{table_capacity}}"
+          }
+        },
+        {
+          "name": "Update Table Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"VACANT\"\n}"
+            },
+            "url": "{{base_url}}/admin/v1/{{admin_id}}/tables/{{table_id}}/status"
+          }
+        },
+        {
+          "name": "Update Item Processing Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"chooseID\": {{choose_id}},\n      \"status\": \"IN_PROGRESS\"\n    }\n  ]\n}"
+            },
+            "url": "{{base_url}}/admin/v1/{{admin_id}}/tables/status"
+          }
+        },
+        {
+          "name": "Get Revenue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/v1/revenue?date={{report_date}}"
+          }
+        },
+        {
+          "name": "Get Transaction Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/admin/v1/transaction?transactionID={{transaction_id}}"
+          }
+        },
+        {
+          "name": "Confirm Payment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{base_url}}/admin/v1/{{admin_id}}/transactions/{{transaction_id}}/confirm-payment"
+          }
+        },
+        {
+          "name": "Edit Menu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemID\": {{item_id}},\n  \"itemName\": \"Updated Dish\",\n  \"type_of_food\": \"Main\",\n  \"price\": 60\n}"
+            },
+            "url": "{{base_url}}/admin/v1/edit_menu"
+          }
+        },
+        {
+          "name": "Add New Dish",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const itemId = json?.data?.itemID;",
+                  "if (itemId) { pm.collectionVariables.set('item_id', String(itemId)); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemName\": \"Fried Rice\",\n  \"type_of_food\": \"Main\",\n  \"price\": 50,\n  \"descriptions\": \"Delicious\",\n  \"preparation_time\": 10,\n  \"image\": null\n}"
+            },
+            "url": "{{base_url}}/admin/v1/new_dish"
+          }
+        }
+      ]
+    }
+  ]
+}

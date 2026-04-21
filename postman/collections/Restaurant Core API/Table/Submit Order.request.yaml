@@ -1,6 +1,6 @@
 $kind: http-request
-name: Checkout Bill
-url: "{{base_url}}/table/v1/orders/{{session_id}}/checkout"
+name: Submit Order
+url: "{{base_url}}/table/v1/menu/{{session_id}}/submit"
 method: POST
 headers:
   Authorization: Bearer {{staff_token}}
@@ -8,8 +8,5 @@ headers:
 body:
   type: text
   content: |-
-    {
-      "payment_method": "CASH",
-      "feedback": "Good service"
-    }
+    {}
 order: 4000
